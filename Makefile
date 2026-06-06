@@ -1,16 +1,32 @@
-# Makefile for OpenGL 3D Solar System setup on macOS
+# Makefile for Modern OpenGL 3.3 Project on macOS
+# Using GLFW, GLAD, and GLM
 
 CXX = clang++
-CXXFLAGS = -Wall -Wextra -std=c++17 -g -Wno-deprecated-declarations
-LDFLAGS = -framework OpenGL -framework GLUT
+CC = clang
+CXXFLAGS = -Wall -Wextra -std=c++17 -g -Wno-deprecated-declarations -I/opt/homebrew/include -Iglad/include
+CFLAGS = -Wall -Wextra -g -Iglad/include
+LDFLAGS = -L/opt/homebrew/lib -lglfw -framework OpenGL -framework Cocoa -framework IOKit -framework CoreVideo
 
 TARGET = solar
-SRC = main.cpp
+CPPSRC = main.cpp Window.cpp Renderer.cpp
+CSRC = glad/src/glad.c
+
+CPPOBJ = $(CPPSRC:.cpp=.o)
+COBJ = $(CSRC:.c=.o)
 
 all: $(TARGET)
 
-$(TARGET): $(SRC)
-	$(CXX) $(CXXFLAGS) $(SRC) -o $(TARGET) $(LDFLAGS)
+$(TARGET): $(CPPOBJ) $(COBJ)
+	$(CXX) $(CPPOBJ) $(COBJ) -o $(TARGET) $(LDFLAGS)
+
+%.o: %.cpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+%.o: %.c
+	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
-	rm -f $(TARGET)
+	rm -f $(TARGET) $(CPPOBJ) $(COBJ)
+	rm -rf $(TARGET).dSYM
+
+.PHONY: all clean

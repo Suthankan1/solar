@@ -1,0 +1,46 @@
+#include "celestial/Moon.h"
+#include "celestial/Planet.h"
+#include "core/Renderer.h"
+#include <glm/gtc/matrix_transform.hpp>
+#include <cmath>
+#include <cstdlib>
+
+Moon::Moon(const std::string& name, float radius, float orbitRadius, float orbitSpeed, float rotationSpeed, const glm::vec3& color, std::shared_ptr<Planet> parentPlanet)
+    : SceneObject(name), m_orbitRadius(orbitRadius), m_orbitSpeed(orbitSpeed),
+      m_rotationSpeed(rotationSpeed), m_color(color), m_parentPlanet(parentPlanet),
+      m_orbitAngle(0.0f), m_rotationAngle(0.0f) {
+    m_orbitAngle = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX) * 2.0f * 3.1415926f;
+    m_transform.setScale(glm::vec3(radius));
+    if (m_parentPlanet) {
+        m_transform.setParent(&m_parentPlanet->getTransform());
+    }
+}
+
+void Moon::update(float deltaTime) {
+    m_orbitAngle += m_orbitSpeed * deltaTime;
+    m_rotationAngle += m_rotationSpeed * deltaTime;
+
+    // Relative orbit calculation
+    glm::vec3 relativePos(
+        std::cos(m_orbitAngle) * m_orbitRadius,
+        0.0f,
+        std::sin(m_orbitAngle) * m_orbitRadius
+    );
+
+    m_transform.setPosition(relativePos);
+    m_transform.setRotation(glm::vec3(0.0f, m_rotationAngle, 0.0f));
+}
+
+void Moon::render(Renderer& renderer) {
+    glm::mat4 model = m_transform.getModelMatrix();
+
+    const Shader& shader = renderer.getShader();
+    shader.use();
+    shader.setBool("useColorOverride", true);
+    shader.setVec3("colorOverride", m_color);
+
+    // Moons are lit by the central star
+    renderer.renderWithLighting(renderer.getSphereMesh(), shader, model);
+
+    shader.setBool("useColorOverride", false);
+}

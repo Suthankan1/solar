@@ -1,8 +1,10 @@
-#include "Window.h"
+#include "core/Window.h"
 #include <iostream>
 
 Window::Window(int width, int height, const std::string& title)
-    : m_window(nullptr), m_width(width), m_height(height), m_title(title) {
+    : m_window(nullptr), m_width(width), m_height(height), m_title(title),
+      m_mouseX(0.0), m_mouseY(0.0), m_mouseDeltaX(0.0), m_mouseDeltaY(0.0),
+      m_scrollDeltaY(0.0), m_firstMouse(true) {
     
     // Set static GLFW error callback
     glfwSetErrorCallback(Window::errorCallback);
@@ -36,6 +38,8 @@ Window::Window(int width, int height, const std::string& title)
     // Set callbacks
     glfwSetFramebufferSizeCallback(m_window, Window::framebufferSizeCallback);
     glfwSetKeyCallback(m_window, Window::keyCallback);
+    glfwSetCursorPosCallback(m_window, Window::mouseCallback);
+    glfwSetScrollCallback(m_window, Window::scrollCallback);
 
     // Initialize GLAD (must be done after making context current)
     if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
@@ -68,7 +72,15 @@ void Window::swapBuffers() {
 }
 
 void Window::pollEvents() {
+    m_mouseDeltaX = 0.0;
+    m_mouseDeltaY = 0.0;
+    m_scrollDeltaY = 0.0;
     glfwPollEvents();
+}
+
+void Window::setTitle(const std::string& title) {
+    m_title = title;
+    glfwSetWindowTitle(m_window, m_title.c_str());
 }
 
 void Window::framebufferSizeCallback(GLFWwindow* window, int width, int height) {
@@ -97,4 +109,32 @@ void Window::keyCallback(GLFWwindow* window, int key, int scancode, int action, 
 
 void Window::errorCallback(int error, const char* description) {
     std::cerr << "GLFW Error (" << error << "): " << description << std::endl;
+}
+
+void Window::setCursorMode(int mode) {
+    glfwSetInputMode(m_window, GLFW_CURSOR, mode);
+    m_firstMouse = true;
+}
+
+void Window::mouseCallback(GLFWwindow* window, double xpos, double ypos) {
+    Window* win = static_cast<Window*>(glfwGetWindowUserPointer(window));
+    if (win) {
+        if (win->m_firstMouse) {
+            win->m_mouseX = xpos;
+            win->m_mouseY = ypos;
+            win->m_firstMouse = false;
+        }
+        win->m_mouseDeltaX += xpos - win->m_mouseX;
+        win->m_mouseDeltaY += win->m_mouseY - ypos; // reversed since y-coordinates go from bottom to top
+        win->m_mouseX = xpos;
+        win->m_mouseY = ypos;
+    }
+}
+
+void Window::scrollCallback(GLFWwindow* window, double xoffset, double yoffset) {
+    (void)xoffset;
+    Window* win = static_cast<Window*>(glfwGetWindowUserPointer(window));
+    if (win) {
+        win->m_scrollDeltaY += yoffset;
+    }
 }

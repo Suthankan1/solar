@@ -1,0 +1,41 @@
+#include "celestial/Planet.h"
+#include "core/Renderer.h"
+#include <glm/gtc/matrix_transform.hpp>
+#include <cmath>
+#include <cstdlib>
+
+Planet::Planet(const std::string& name, float radius, float orbitRadius, float orbitSpeed, float rotationSpeed, const glm::vec3& color)
+    : SceneObject(name), m_orbitRadius(orbitRadius), m_orbitSpeed(orbitSpeed),
+      m_rotationSpeed(rotationSpeed), m_color(color), m_orbitAngle(0.0f), m_rotationAngle(0.0f) {
+    // Spread out planets by randomizing their initial orbit position
+    m_orbitAngle = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX) * 2.0f * 3.1415926f;
+    m_transform.setScale(glm::vec3(radius));
+}
+
+void Planet::update(float deltaTime) {
+    m_orbitAngle += m_orbitSpeed * deltaTime;
+    m_rotationAngle += m_rotationSpeed * deltaTime;
+
+    // Calculate 3D position in the XZ plane
+    glm::vec3 position;
+    position.x = std::cos(m_orbitAngle) * m_orbitRadius;
+    position.y = 0.0f;
+    position.z = std::sin(m_orbitAngle) * m_orbitRadius;
+
+    m_transform.setPosition(position);
+    m_transform.setRotation(glm::vec3(0.0f, m_rotationAngle, 0.0f));
+}
+
+void Planet::render(Renderer& renderer) {
+    glm::mat4 model = m_transform.getModelMatrix();
+
+    const Shader& shader = renderer.getShader();
+    shader.use();
+    shader.setBool("useColorOverride", true);
+    shader.setVec3("colorOverride", m_color);
+
+    // Planets are lit by the central star
+    renderer.renderWithLighting(renderer.getSphereMesh(), shader, model);
+
+    shader.setBool("useColorOverride", false);
+}

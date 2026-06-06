@@ -17,10 +17,16 @@ public:
     bool shouldClose() const;
     void swapBuffers();
     void pollEvents();
+    void setTitle(const std::string& title);
 
     GLFWwindow* getGLFWWindow() const { return m_window; }
     int getWidth() const { return m_width; }
     int getHeight() const { return m_height; }
+
+    double getMouseDeltaX() const { return m_mouseDeltaX; }
+    double getMouseDeltaY() const { return m_mouseDeltaY; }
+    double getScrollDeltaY() const { return m_scrollDeltaY; }
+    void setCursorMode(int mode);
 
 private:
     GLFWwindow* m_window;
@@ -28,7 +34,16 @@ private:
     int m_height;
     std::string m_title;
 
+    double m_mouseX;
+    double m_mouseY;
+    double m_mouseDeltaX;
+    double m_mouseDeltaY;
+    double m_scrollDeltaY;
+    bool m_firstMouse;
+
     static void framebufferSizeCallback(GLFWwindow* window, int width, int height);
     static void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods);
+    static void mouseCallback(GLFWwindow* window, double xpos, double ypos);
+    static void scrollCallback(GLFWwindow* window, double xoffset, double yoffset);
     static void errorCallback(int error, const char* description);
 };

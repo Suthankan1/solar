@@ -1,0 +1,9 @@
+# Build files
+build/
+*.o
+*.dSYM/
+solar
+
+# IDEs
+.vscode/
+.DS_Store

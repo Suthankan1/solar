@@ -1,7 +1,7 @@
 # Makefile for OpenGL 3D Solar System setup on macOS
 
 CXX = clang++
-CXXFLAGS = -Wall -Wextra -std=c++17 -Wno-deprecated-declarations
+CXXFLAGS = -Wall -Wextra -std=c++17 -g -Wno-deprecated-declarations
 LDFLAGS = -framework OpenGL -framework GLUT
 
 TARGET = solar

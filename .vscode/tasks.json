@@ -2,21 +2,9 @@
     "version": "2.0.0",
     "tasks": [
         {
-            "type": "cppbuild",
             "label": "Build Native Mac GLUT Project",
-            "command": "/usr/bin/clang++",
-            "args": [
-                "-std=c++17",
-                "-Wno-deprecated-declarations",
-                "-g",
-                "${file}",
-                "-o",
-                "${fileDirname}/main",
-                "-framework",
-                "OpenGL",
-                "-framework",
-                "GLUT"
-            ],
+            "type": "shell",
+            "command": "make",
             "options": {
                 "cwd": "${workspaceFolder}"
             },
@@ -27,6 +15,18 @@
                 "kind": "build",
                 "isDefault": true
             }
+        },
+        {
+            "label": "Clean Native Mac GLUT Project",
+            "type": "shell",
+            "command": "make",
+            "args": [
+                "clean"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": []
         }
     ]
 }

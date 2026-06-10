@@ -25,6 +25,7 @@ void Sun::render(Renderer& renderer) {
     shader.setFloat("emissiveStrength", 0.6f);
     shader.setBool("useColorOverride", true);
     shader.setVec3("colorOverride", m_color);
+    shader.setInt("planetId", 0);
 
     // Star does not get lit by itself, render it unlit
     renderer.render(renderer.getSphereMesh(), shader, model);

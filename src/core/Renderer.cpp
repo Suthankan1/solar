@@ -48,6 +48,7 @@ void Renderer::render(const Mesh& mesh, const Shader& shader, const glm::mat4& m
     shader.setMat4("view", view);
     shader.setMat4("projection", projection);
     shader.setBool("useLighting", false);
+    shader.setInt("planetId", -1);
 
     mesh.draw();
 
@@ -70,6 +71,7 @@ void Renderer::renderWithLighting(const Mesh& mesh, const Shader& shader,
     shader.setVec3("lightPos", lightPos);
     shader.setVec3("lightColor", lightColor);
     shader.setVec3("viewPos", viewPos);
+    shader.setInt("planetId", -1);
 
     mesh.draw();
 

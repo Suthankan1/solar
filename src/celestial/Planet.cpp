@@ -34,6 +34,18 @@ void Planet::render(Renderer& renderer) {
     shader.setBool("useColorOverride", true);
     shader.setVec3("colorOverride", m_color);
 
+    int planetId = -1;
+    if (m_name == "Mercury") planetId = 1;
+    else if (m_name == "Venus") planetId = 2;
+    else if (m_name == "Earth") planetId = 3;
+    else if (m_name == "Mars") planetId = 4;
+    else if (m_name == "Jupiter") planetId = 5;
+    else if (m_name == "Saturn") planetId = 6;
+    else if (m_name == "Uranus") planetId = 7;
+    else if (m_name == "Neptune") planetId = 8;
+    
+    shader.setInt("planetId", planetId);
+
     // Planets are lit by the central star
     renderer.renderWithLighting(renderer.getSphereMesh(), shader, model);
 

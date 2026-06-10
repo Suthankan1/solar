@@ -39,6 +39,14 @@ void Moon::render(Renderer& renderer) {
     shader.setBool("useColorOverride", true);
     shader.setVec3("colorOverride", m_color);
 
+    int planetId = -1;
+    if (m_name == "Moon") planetId = 9;
+    else if (m_name == "Phobos") planetId = 10;
+    else if (m_name == "Io") planetId = 11;
+    else if (m_name == "Europa") planetId = 12;
+
+    shader.setInt("planetId", planetId);
+
     // Moons are lit by the central star
     renderer.renderWithLighting(renderer.getSphereMesh(), shader, model);
 

@@ -7,6 +7,10 @@
 
 class Planet;
 
+/**
+ * @class Orbit
+ * @brief Provides a visual representation of an orbital path as a GL_LINE_LOOP ring mesh.
+ */
 class Orbit : public SceneObject {
 public:
     Orbit(const std::string& name, float radius, const glm::vec3& color, std::shared_ptr<Planet> parentPlanet = nullptr);

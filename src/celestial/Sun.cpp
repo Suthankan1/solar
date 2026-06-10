@@ -10,17 +10,19 @@ Sun::Sun(const std::string& name, float radius, const glm::vec3& color, const gl
 }
 
 void Sun::update(float deltaTime) {
-    (void)deltaTime;
+    m_rotationAngle += m_rotationSpeed * deltaTime;
 }
 
 void Sun::render(Renderer& renderer) {
     // Register the star's position and color as the main light source for planets/moons
     renderer.setLightSource(m_transform.getPosition(), m_lightColor);
 
+    m_transform.setRotation(glm::vec3(0.0f, m_rotationAngle, 0.0f));
     glm::mat4 model = m_transform.getModelMatrix();
 
     const Shader& shader = renderer.getShader();
     shader.use();
+    shader.setFloat("emissiveStrength", 0.6f);
     shader.setBool("useColorOverride", true);
     shader.setVec3("colorOverride", m_color);
 
@@ -29,4 +31,5 @@ void Sun::render(Renderer& renderer) {
 
     // Reset override
     shader.setBool("useColorOverride", false);
+    shader.setFloat("emissiveStrength", 0.0f);
 }

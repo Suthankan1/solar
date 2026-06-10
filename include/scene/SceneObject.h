@@ -9,7 +9,7 @@ public:
     SceneObject(const std::string& name) : m_name(name), m_active(true) {}
     virtual ~SceneObject() = default;
 
-    virtual void update(float deltaTime) = 0;
+    virtual void update(float) {}
     virtual void render(Renderer& renderer) = 0;
 
     const std::string& getName() const { return m_name; }

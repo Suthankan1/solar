@@ -7,12 +7,19 @@
 
 // Camera base constructor
 Camera::Camera(const std::string& name, const glm::vec3& position, const glm::vec3& target, const glm::vec3& up)
-    : SceneObject(name), m_position(position), m_up(up), m_fov(45.0f), m_nearPlane(0.1f), m_farPlane(1000.0f) {
+    : SceneObject(name), m_position(position), m_up(up), m_fov(45.0f), m_nearPlane(0.1f), m_farPlane(1000.0f),
+      m_targetPosition(position), m_targetLookAt(target), m_transitioning(false) {
     if (glm::length(target - position) > 0.0001f) {
         m_front = glm::normalize(target - position);
     } else {
         m_front = glm::vec3(0.0f, 0.0f, -1.0f);
     }
+}
+
+void Camera::setTargetView(const glm::vec3& pos, const glm::vec3& lookat) {
+    m_targetPosition = pos;
+    m_targetLookAt = lookat;
+    m_transitioning = true;
 }
 
 glm::mat4 Camera::getViewMatrix() const {
@@ -26,6 +33,20 @@ glm::mat4 Camera::getProjectionMatrix(float aspect) const {
 // StaticCamera
 StaticCamera::StaticCamera(const std::string& name, const glm::vec3& position, const glm::vec3& target)
     : Camera(name, position, target) {}
+
+void StaticCamera::update(float dt) {
+    if (m_transitioning) {
+        m_position = glm::mix(m_position, m_targetPosition, dt * m_transitionSpeed);
+        m_front = glm::normalize(glm::mix(m_position + m_front, m_targetLookAt, dt * m_transitionSpeed) - m_position);
+        if (glm::distance(m_position, m_targetPosition) < 0.01f) {
+            m_position = m_targetPosition;
+            if (glm::length(m_targetLookAt - m_position) > 0.0001f) {
+                m_front = glm::normalize(m_targetLookAt - m_position);
+            }
+            m_transitioning = false;
+        }
+    }
+}
 
 // OrbitingCamera
 OrbitingCamera::OrbitingCamera(const std::string& name, float distance, float speed, float height)

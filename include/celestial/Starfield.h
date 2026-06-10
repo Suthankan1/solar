@@ -9,7 +9,6 @@ public:
     Starfield(const std::string& name, unsigned int count, float radius);
     virtual ~Starfield() = default;
 
-    void update(float) override {}
     void render(Renderer& renderer) override;
 
 private:

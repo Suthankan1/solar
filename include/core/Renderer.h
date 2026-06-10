@@ -39,7 +39,6 @@ public:
     // Access to internal resources
     const Shader& getShader() const { return *m_shader; }
     const Mesh& getSphereMesh() const { return *m_sphereMesh; }
-    const Mesh& getCubeMesh() const { return *m_cubeMesh; }
 
     // Render a mesh using a specific shader and MVP matrices
     void render(const Mesh& mesh, const Shader& shader, const glm::mat4& model, const glm::mat4& view, const glm::mat4& projection);
@@ -54,18 +53,13 @@ public:
     void renderWithLighting(const Mesh& mesh, const Shader& shader, const glm::mat4& model);
 
     // Static shape generators to support modern OpenGL data management
-    static Mesh createCube();
     static Mesh createSphere(float radius, unsigned int rings, unsigned int sectors);
     static Mesh createRing(float radius, unsigned int segments);
-
-    // Backward compatibility for existing main loop
-    void render(int width, int height, float time);
 
     void cleanup();
 
 private:
     std::unique_ptr<Shader> m_shader;
-    std::unique_ptr<Mesh> m_cubeMesh;
     std::unique_ptr<Mesh> m_sphereMesh;
 
     glm::mat4 m_viewMatrix = glm::mat4(1.0f);

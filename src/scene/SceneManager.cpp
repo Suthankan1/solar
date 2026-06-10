@@ -54,7 +54,7 @@ void SceneManager::setActiveCamera(std::shared_ptr<Camera> camera) {
 
 void SceneManager::update(float deltaTime) {
     for (auto& object : m_objects) {
-        if (object && object->isActive()) {
+        if (object && object->isActive() && object != m_activeCamera) {
             object->update(deltaTime);
         }
     }
@@ -66,7 +66,8 @@ void SceneManager::render(Renderer& renderer) {
         GLint viewport[4];
         glGetIntegerv(GL_VIEWPORT, viewport);
         
-        float aspect = 1.777f;
+        // Fallback to standard 16:9 aspect ratio if the viewport height is invalid (<= 0)
+        float aspect = 16.0f / 9.0f;
         if (viewport[3] > 0) {
             aspect = static_cast<float>(viewport[2]) / static_cast<float>(viewport[3]);
         }

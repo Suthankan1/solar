@@ -1,6 +1,7 @@
 # Build files
 build/
 *.o
+glad/src/*.o
 *.dSYM/
 solar
 

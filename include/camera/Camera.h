@@ -27,6 +27,9 @@ public:
     float getNearPlane() const { return m_nearPlane; }
     float getFarPlane() const { return m_farPlane; }
 
+    void setTargetView(const glm::vec3& pos, const glm::vec3& lookat);
+    bool isTransitioning() const { return m_transitioning; }
+
 protected:
     glm::vec3 m_position;
     glm::vec3 m_front;
@@ -34,17 +37,28 @@ protected:
     float m_fov;         // in degrees
     float m_nearPlane;
     float m_farPlane;
+
+    glm::vec3 m_targetPosition;
+    glm::vec3 m_targetLookAt;
+    float m_transitionSpeed = 3.0f;
+    bool m_transitioning = false;
 };
 
-// 1. StaticCamera: Fixed camera looking at a specific point
+/**
+ * @class StaticCamera
+ * @brief A fixed-position observational camera.
+ */
 class StaticCamera : public Camera {
 public:
     StaticCamera(const std::string& name, const glm::vec3& position, const glm::vec3& target = glm::vec3(0.0f));
-    void update(float) override {}
+    void update(float dt) override;
     void render(Renderer&) override {}
 };
 
-// 2. OrbitingCamera: Auto-orbits around the origin
+/**
+ * @class OrbitingCamera
+ * @brief A camera that automatically circles the scene center.
+ */
 class OrbitingCamera : public Camera {
 public:
     OrbitingCamera(const std::string& name, float distance, float speed, float height = 2.0f);
@@ -57,8 +71,11 @@ private:
     float m_angle;
 };
 
-// 3. TrackingCamera: Tracks a moving target planet
 class Planet;
+/**
+ * @class TrackingCamera
+ * @brief A camera that follows a specific planet.
+ */
 class TrackingCamera : public Camera {
 public:
     TrackingCamera(const std::string& name, std::shared_ptr<Planet> target, const glm::vec3& offset);
@@ -69,7 +86,10 @@ private:
     glm::vec3 m_offset;
 };
 
-// 4. FreeCamera: Fly-through camera controlled by W/S/A/D, Q/E, and Arrow keys
+/**
+ * @class FreeCamera
+ * @brief A player-controlled first-person camera.
+ */
 class FreeCamera : public Camera {
 public:
     FreeCamera(const std::string& name, const glm::vec3& position);

@@ -1,6 +1,7 @@
 #include "celestial/Starfield.h"
 #include "core/Renderer.h"
 #include <glm/gtc/matrix_transform.hpp>
+#include <GLFW/glfw3.h>
 #include <cstdlib>
 #include <cmath>
 
@@ -25,9 +26,12 @@ Starfield::Starfield(const std::string& name, unsigned int count, float radius)
         v.position = glm::vec3(x, y, z);
         v.normal = -glm::normalize(v.position);
         
-        // Random brightness for shimmering star aesthetic
-        float brightness = 0.6f + static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX) * 0.4f;
-        v.color = glm::vec3(brightness);
+        // Random brightness for shimmering star aesthetic with wider range
+        float rand_float = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX);
+        float brightness = 0.4f + (rand_float * 0.6f);
+        // Twinkle phase offset: range 0..1 encoded in the green channel
+        float phase_offset = (float)(std::rand() % 100) / 100.0f;
+        v.color = glm::vec3(brightness, phase_offset, brightness);
         v.texCoords = glm::vec2(0.0f);
 
         vertices.push_back(v);
@@ -49,12 +53,18 @@ void Starfield::render(Renderer& renderer) {
     const Shader& shader = renderer.getShader();
     shader.use();
     shader.setBool("useColorOverride", false);
+    shader.setFloat("time", (float)glfwGetTime());
+    shader.setBool("isStarfield", true);
 
     // Disable depth write so stars always render behind everything else
     glDepthMask(GL_FALSE);
 
+    glPointSize(2.0f);  // Add this before drawing
     renderer.render(*m_mesh, shader, model);
+    glPointSize(1.0f);  // reset
 
     // Re-enable depth write
     glDepthMask(GL_TRUE);
+
+    shader.setBool("isStarfield", false);
 }

@@ -29,9 +29,11 @@ void Orbit::render(Renderer& renderer) {
     shader.use();
     shader.setBool("useColorOverride", true);
     shader.setVec3("colorOverride", m_color);
+    shader.setFloat("globalAlpha", 0.45f);
 
     // Orbit lines are drawn unlit
     renderer.render(*m_mesh, shader, model);
 
     shader.setBool("useColorOverride", false);
+    shader.setFloat("globalAlpha", 1.0f);
 }

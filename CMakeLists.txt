@@ -35,6 +35,12 @@ set(SOURCES
     src/celestial/Sun.cpp
     src/celestial/Orbit.cpp
     src/celestial/Starfield.cpp
+    src/celestial/SaturnRings.cpp
+    include/celestial/SaturnRings.h
+    src/celestial/SunHalo.cpp
+    include/celestial/SunHalo.h
+    src/celestial/AsteroidBelt.cpp
+    include/celestial/AsteroidBelt.h
     src/animation/AnimationComponent.cpp
     src/lighting/LightingComponent.cpp
     src/utilities/TextRenderer.cpp
@@ -45,6 +51,10 @@ add_executable(solar ${SOURCES})
 
 # Target compiler warning flags
 target_compile_options(solar PRIVATE -Wall -Wextra -Wno-deprecated-declarations)
+
+if(CMAKE_BUILD_TYPE STREQUAL "Release")
+    target_compile_options(solar PRIVATE -O2)
+endif()
 
 # Frameworks and library links on macOS
 if(APPLE)

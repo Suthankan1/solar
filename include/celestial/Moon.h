@@ -7,6 +7,10 @@
 
 class Planet;
 
+/**
+ * @class Moon
+ * @brief Represents a natural satellite that transforms relative to its parent planet using the Transform hierarchy.
+ */
 class Moon : public SceneObject {
 public:
     Moon(const std::string& name, float radius, float orbitRadius, float orbitSpeed, float rotationSpeed, const glm::vec3& color, std::shared_ptr<Planet> parentPlanet);

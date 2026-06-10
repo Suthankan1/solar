@@ -4,6 +4,10 @@
 #include "scene/Transform.h"
 #include <glm/glm.hpp>
 
+/**
+ * @class Sun
+ * @brief Represents the central star that acts as the scene's primary light source.
+ */
 class Sun : public SceneObject {
 public:
     Sun(const std::string& name, float radius, const glm::vec3& color, const glm::vec3& lightColor = glm::vec3(1.0f));
@@ -22,4 +26,6 @@ private:
     glm::vec3 m_color;
     glm::vec3 m_lightColor;
     Transform m_transform;
+    float m_rotationAngle = 0.0f;
+    float m_rotationSpeed = 0.1f;
 };

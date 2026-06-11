@@ -26,8 +26,6 @@ void AtmosphereLayer::render(Renderer& renderer) {
     if (!m_earth) return;
 
     glm::mat4 model = m_transform.getModelMatrix();
-    const Shader& shader = renderer.getShader();
-    shader.use();
 
     // Enable transparent alpha blending
     glEnable(GL_BLEND);
@@ -36,16 +34,28 @@ void AtmosphereLayer::render(Renderer& renderer) {
     // Disable depth write to avoid sorting/clipping artifacts
     glDepthMask(GL_FALSE);
 
-    shader.setInt("planetId", 14); // Atmosphere ID in shaders
-    shader.setBool("useTexture", false);
-    shader.setBool("useColorOverride", true);
-    shader.setVec3("colorOverride", m_color);
+    if (renderer.getEarthShader() != nullptr) {
+        const Shader& shader = *renderer.getEarthShader();
+        shader.use();
 
-    // Render using Earth's sphere mesh and lighting parameters
-    renderer.renderWithLighting(renderer.getSphereMesh(), shader, model);
+        shader.setInt("earthMode", 2); // Mode 2: Atmosphere rendering
+
+        renderer.renderWithLighting(renderer.getSphereMesh(), shader, model);
+    } else {
+        const Shader& shader = renderer.getShader();
+        shader.use();
+
+        shader.setInt("planetId", 14); // Atmosphere ID in shaders
+        shader.setBool("useTexture", false);
+        shader.setBool("useColorOverride", true);
+        shader.setVec3("colorOverride", m_color);
+
+        renderer.renderWithLighting(renderer.getSphereMesh(), shader, model);
+
+        shader.setBool("useColorOverride", false);
+    }
 
     // Restore standard OpenGL states
     glDepthMask(GL_TRUE);
     glDisable(GL_BLEND);
-    shader.setBool("useColorOverride", false);
 }

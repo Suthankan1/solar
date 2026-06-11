@@ -39,6 +39,7 @@ private:
     std::shared_ptr<Planet> m_earth;
     std::shared_ptr<Planet> m_mars;
     float m_progress; // ranges from 0.0f (Earth) to 1.0f (Mars)
+    float m_rollAngle; // subtle roll rotation (barbecue roll)
 
     glm::vec3 m_position;
     glm::vec3 m_forward;
@@ -47,6 +48,7 @@ private:
     // Primitives to assemble the spacecraft
     std::unique_ptr<Mesh> m_cubeMesh;
     std::unique_ptr<Mesh> m_cylinderMesh;
+    std::unique_ptr<Mesh> m_coneMesh;
 
     // Trajectory path line rendering
     std::unique_ptr<Mesh> m_trajectoryMesh;
@@ -54,8 +56,10 @@ private:
     // Curve evaluation helpers
     glm::vec3 getPositionForT(float t) const;
     glm::vec3 getTangentForT(float t) const;
+    glm::vec3 getPlanetPositionAtAngle(std::shared_ptr<Planet> planet, float angle) const;
 
     // Primitive generators
     static Mesh createUnitCube();
     static Mesh createUnitCylinder(unsigned int segments = 16);
+    static Mesh createUnitCone(unsigned int segments = 16);
 };

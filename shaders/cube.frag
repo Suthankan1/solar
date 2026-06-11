@@ -93,6 +93,48 @@ void main() {
     float specularVal = 0.5; // Default specular strength
     float activeEmissive = emissiveStrength;
 
+    if (planetId == 200) {
+        // Space Station custom rim light and shading
+        float dotVN = dot(normalize(viewPos - FragPos), norm);
+        float rim = 1.0 - max(dotVN, 0.0);
+        float rimLight = pow(rim, 4.0) * 0.7; // prominent edge glow
+        vec3 rimColor = vec3(0.5, 0.8, 1.0);  // subtle blue/white rim color
+        
+        // Standard lighting components
+        float diff = max(dot(norm, normalize(lightPos - FragPos)), 0.0);
+        vec3 diffuse = diff * lightColor;
+        
+        vec3 reflectDir = reflect(-normalize(lightPos - FragPos), norm);
+        float spec = pow(max(dot(normalize(viewPos - FragPos), reflectDir), 0.0), 32.0);
+        vec3 specular = specularVal * spec * lightColor;
+        
+        float distance = length(lightPos - FragPos);
+        float attenuation = 1.0 / (lightConstant + lightLinear * distance + lightQuadratic * distance * distance);
+        
+        // Low ambient for space station shadow areas
+        float ambientStrength = 0.05;
+        vec3 ambient = ambientStrength * lightColor;
+        
+        vec3 result = (ambient + attenuation * (diffuse + specular)) * baseColor;
+        result += rimLight * rimColor * (0.3 + 0.7 * attenuation); // Add the white/blue rim light
+        
+        FragColor = vec4(result, globalAlpha);
+        return;
+    }
+
+    if (planetId == 100) {
+        // SunHalo: Radial fade using TexCoords.y (0.0 is inner, 1.0 is outer)
+        float alpha = 1.0 - TexCoords.y;
+        alpha = pow(alpha, 3.0); // cubic falloff for a soft glow
+        
+        vec3 glowColor = useColorOverride ? colorOverride : vec3(1.0, 0.55, 0.05);
+        // Apply emissive multiplier for extra intensity near the sun
+        vec3 finalGlow = glowColor * (1.0 + activeEmissive);
+        
+        FragColor = vec4(finalGlow, alpha * globalAlpha);
+        return;
+    }
+
     if (planetId == 14) {
         // Atmosphere: subtle blue scattering halo
         float dotVN = dot(normalize(viewPos - FragPos), norm);
@@ -166,6 +208,7 @@ void main() {
             }
         } else if (planetId == 9) {
             specularVal = 0.05;
+            norm = perturbNormal(LocalPos, norm, 22.0, 0.06);
         }
     } else {
         // Apply procedural planet surface shaders
@@ -351,10 +394,35 @@ void main() {
     if (!useLighting) {
         // Output base color directly for unlit/glowing objects
         if (isStarfield) {
-            // Twinkle: use the green channel as a per-star phase offset
-            float twinklePhase = Color.g * 6.28318;  // 2*PI * phase
-            float twinkle = 0.85 + 0.15 * sin(time * 3.0 + twinklePhase);
-            FragColor = vec4(vec3(Color.r, Color.r, Color.b) * twinkle * (useColorOverride ? colorOverride : vec3(1.0)), globalAlpha);
+            float dist = length(gl_PointCoord - vec2(0.5));
+            if (dist > 0.5) discard;
+
+            float isGalaxy = Normal.x;
+            float maxAlpha = Normal.y;
+            
+            float alpha = 0.0;
+            vec3 finalStarColor = Color;
+
+            if (isGalaxy > 0.5) {
+                // Galaxy band/nebula dust: soft radial falloff
+                float falloff = 1.0 - (dist / 0.5);
+                alpha = pow(falloff, 2.5) * maxAlpha;
+                
+                // Add a very subtle slow nebula shimmer
+                float shimmer = 0.9 + 0.1 * sin(time * 0.5 + TexCoords.x * 6.28);
+                finalStarColor *= shimmer;
+            } else {
+                // Sharp star: very steep falloff to avoid cartoon dots, with a tiny glow core
+                float falloff = smoothstep(0.5, 0.0, dist);
+                alpha = pow(falloff, 4.0) * maxAlpha;
+                
+                // Star twinkle
+                float twinklePhase = TexCoords.x * 6.28318;
+                float twinkle = 0.4 + 0.6 * sin(time * (1.5 + TexCoords.x * 3.0) + twinklePhase);
+                finalStarColor *= twinkle;
+            }
+            
+            FragColor = vec4(finalStarColor, alpha * globalAlpha);
         } else if (activeEmissive > 0.0) {
             FragColor = vec4(baseColor * (1.0 + activeEmissive), globalAlpha);
         } else {

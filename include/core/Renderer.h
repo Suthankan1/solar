@@ -46,6 +46,7 @@ public:
 
     // Access to internal resources
     const Shader& getShader() const { return *m_shader; }
+    const Shader* getEarthShader() const { return m_earthShader.get(); }
     const Mesh& getSphereMesh() const { return *m_sphereMesh; }
 
     // Render a mesh using a specific shader and MVP matrices
@@ -60,15 +61,40 @@ public:
     void render(const Mesh& mesh, const Shader& shader, const glm::mat4& model);
     void renderWithLighting(const Mesh& mesh, const Shader& shader, const glm::mat4& model);
 
+    // Framebuffer-based post-processing methods
+    void beginFrame();
+    void endFrame(bool bloomEnabled);
+
     // Static shape generators to support modern OpenGL data management
     static Mesh createSphere(float radius, unsigned int rings, unsigned int sectors);
     static Mesh createRing(float radius, unsigned int segments);
+    static Mesh createEllipticalRing(float semiMajor, float semiMinor, float inclinationDeg, float longitudeOfAscendingNodeDeg, unsigned int segments);
 
     void cleanup();
 
 private:
     std::unique_ptr<Shader> m_shader;
+    std::unique_ptr<Shader> m_earthShader;
     std::unique_ptr<Mesh> m_sphereMesh;
+
+    // Post-processing resources
+    unsigned int m_hdrFBO = 0;
+    unsigned int m_hdrColorBuffer = 0;
+    unsigned int m_depthRBO = 0;
+    unsigned int m_pingpongFBO[2] = {0, 0};
+    unsigned int m_pingpongColorBuffers[2] = {0, 0};
+    int m_fboWidth = 0;
+    int m_fboHeight = 0;
+
+    unsigned int m_quadVAO = 0;
+    unsigned int m_quadVBO = 0;
+
+    std::unique_ptr<Shader> m_bloomShader;
+    std::unique_ptr<Shader> m_blurShader;
+
+    void createFBOs(int width, int height);
+    void initQuad();
+    void renderQuad();
 
     glm::mat4 m_viewMatrix = glm::mat4(1.0f);
     glm::mat4 m_projMatrix = glm::mat4(1.0f);

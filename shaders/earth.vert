@@ -13,16 +13,10 @@ out vec3 LocalPos;
 uniform mat4 model;
 uniform mat4 view;
 uniform mat4 projection;
-uniform bool isStarfield = false;
 
 void main() {
     FragPos = vec3(model * vec4(aPos, 1.0));
-    if (isStarfield) {
-        Normal = aNormal;
-        gl_PointSize = aTexCoords.y;
-    } else {
-        Normal = mat3(transpose(inverse(model))) * aNormal;
-    }
+    Normal = mat3(transpose(inverse(model))) * aNormal;
     Color = aColor;
     TexCoords = aTexCoords;
     LocalPos = aPos;

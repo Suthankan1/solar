@@ -28,8 +28,6 @@ void CloudLayer::render(Renderer& renderer) {
     if (!m_earth) return;
 
     glm::mat4 model = m_transform.getModelMatrix();
-    const Shader& shader = renderer.getShader();
-    shader.use();
 
     // Enable transparent alpha blending
     glEnable(GL_BLEND);
@@ -38,12 +36,35 @@ void CloudLayer::render(Renderer& renderer) {
     // Disable depth write so clouds do not block other transparent layers or geometry
     glDepthMask(GL_FALSE);
 
-    shader.setInt("planetId", 13); // CloudLayer ID in shaders
-    shader.setBool("useTexture", false);
-    shader.setBool("useColorOverride", false);
+    if (renderer.getEarthShader() != nullptr) {
+        const Shader& shader = *renderer.getEarthShader();
+        shader.use();
 
-    // Render using Earth's sphere mesh and lighting parameters
-    renderer.renderWithLighting(renderer.getSphereMesh(), shader, model);
+        shader.setInt("earthMode", 1); // Mode 1: Cloud rendering
+
+        const Texture* cloudTex = m_earth->getCloudTexture();
+        bool hasTexture = cloudTex && cloudTex->isValid();
+        shader.setBool("useCloudTexture", hasTexture);
+        if (hasTexture) {
+            cloudTex->bind(2);
+            shader.setInt("cloudTexture", 2);
+        }
+
+        renderer.renderWithLighting(renderer.getSphereMesh(), shader, model);
+
+        if (hasTexture) {
+            cloudTex->unbind();
+        }
+    } else {
+        const Shader& shader = renderer.getShader();
+        shader.use();
+
+        shader.setInt("planetId", 13); // CloudLayer ID in standard shaders
+        shader.setBool("useTexture", false);
+        shader.setBool("useColorOverride", false);
+
+        renderer.renderWithLighting(renderer.getSphereMesh(), shader, model);
+    }
 
     // Restore standard OpenGL states
     glDepthMask(GL_TRUE);

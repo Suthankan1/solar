@@ -7,7 +7,7 @@
 
 SpaceStation::SpaceStation(const std::string& name, float orbitRadius, float orbitSpeed, std::shared_ptr<Planet> parentPlanet)
     : SceneObject(name), m_orbitRadius(orbitRadius), m_orbitSpeed(orbitSpeed),
-      m_parentPlanet(parentPlanet), m_orbitAngle(0.0f) {
+      m_parentPlanet(parentPlanet), m_orbitAngle(0.0f), m_time(0.0f) {
     
     // Spread out the station's start position along the orbit
     m_orbitAngle = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX) * 2.0f * 3.1415926f;
@@ -23,6 +23,7 @@ SpaceStation::SpaceStation(const std::string& name, float orbitRadius, float orb
 
 void SpaceStation::update(float deltaTime) {
     m_orbitAngle += m_orbitSpeed * deltaTime;
+    m_time += deltaTime;
 
     // Calculate position in the XZ plane relative to the parent planet
     glm::vec3 relativePos(
@@ -33,14 +34,32 @@ void SpaceStation::update(float deltaTime) {
 
     m_transform.setPosition(relativePos);
 
-    // Give it a slow rotation to align its orientation over time
-    m_transform.setRotation(glm::vec3(0.0f, m_orbitAngle * 0.5f, 0.0f));
+    // Lock orientation relative to Earth (yaw = -orbitAngle) plus slow roll self-rotation
+    m_transform.setRotation(glm::vec3(0.0f, -m_orbitAngle, m_time * 0.05f));
+}
+
+glm::vec3 SpaceStation::getCloseUpTargetPoint() const {
+    glm::mat4 model = m_transform.getModelMatrix();
+    // Offset target slightly along the truss (X) and forward modules (Z) for detailed camera tracking
+    return glm::vec3(model * glm::vec4(0.008f, -0.005f, 0.012f, 1.0f));
 }
 
 void SpaceStation::render(Renderer& renderer) {
     if (!m_cubeMesh || !m_cylinderMesh) return;
 
+    // Dynamic Scale Factor: Scale up when camera is close, but keep it small relative to Earth
+    float distanceToCamera = glm::distance(renderer.getCameraPosition(), getPosition());
+    float scaleFactor = 1.0f;
+    if (distanceToCamera < 1.2f) {
+        // Smoothly scale up from 1.0x to 2.4x as the camera gets close
+        float t = glm::clamp((1.2f - distanceToCamera) / 1.0f, 0.0f, 1.0f);
+        scaleFactor = glm::mix(1.0f, 2.4f, t);
+    } else {
+        scaleFactor = 1.0f;
+    }
+
     glm::mat4 modelBase = m_transform.getModelMatrix();
+    modelBase = glm::scale(modelBase, glm::vec3(scaleFactor));
 
     const Shader& shader = renderer.getShader();
     shader.use();
@@ -48,116 +67,224 @@ void SpaceStation::render(Renderer& renderer) {
     // Disable texture mapping to use color overrides
     shader.setBool("useTexture", false);
     shader.setBool("useColorOverride", true);
-    shader.setInt("planetId", -1);
+    shader.setInt("planetId", 200); // Trigger custom white/blue rim light effect in cube.frag
 
-    // 1. Central body module (pressurized modules Destiny, Unity, Zarya, etc.)
-    // Cylinder is along local Y-axis by default, we rotate it 90 deg around X to align along Z
-    glm::mat4 centralModel = modelBase;
-    centralModel = glm::rotate(centralModel, glm::radians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
-    centralModel = glm::scale(centralModel, glm::vec3(0.012f, 0.040f, 0.012f)); // radius = 0.006, height = 0.040
-    shader.setVec3("colorOverride", glm::vec3(0.70f, 0.72f, 0.75f)); // metallic grey
-    renderer.renderWithLighting(*m_cylinderMesh, shader, centralModel);
+    // Reusable lambdas for rendering primitives hierarchically
+    auto renderCylinder = [&](const glm::mat4& parentMat, const glm::vec3& translate, const glm::vec3& scale, const glm::vec3& rotationEuler, const glm::vec3& color) {
+        glm::mat4 m = parentMat;
+        m = glm::translate(m, translate);
+        if (rotationEuler.x != 0.0f) m = glm::rotate(m, rotationEuler.x, glm::vec3(1.0f, 0.0f, 0.0f));
+        if (rotationEuler.y != 0.0f) m = glm::rotate(m, rotationEuler.y, glm::vec3(0.0f, 1.0f, 0.0f));
+        if (rotationEuler.z != 0.0f) m = glm::rotate(m, rotationEuler.z, glm::vec3(0.0f, 0.0f, 1.0f));
+        m = glm::scale(m, scale);
+        shader.setVec3("colorOverride", color);
+        renderer.renderWithLighting(*m_cylinderMesh, shader, m);
+    };
 
-    // 2. Truss structure (supports the solar panel wings)
-    // Cylinder along local Y-axis rotated 90 deg around Z to align along X
-    glm::mat4 trussModel = modelBase;
-    trussModel = glm::rotate(trussModel, glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-    trussModel = glm::scale(trussModel, glm::vec3(0.004f, 0.070f, 0.004f)); // radius = 0.002, height = 0.070
-    shader.setVec3("colorOverride", glm::vec3(0.55f, 0.55f, 0.58f)); // darker grey truss
-    renderer.renderWithLighting(*m_cylinderMesh, shader, trussModel);
+    auto renderCube = [&](const glm::mat4& parentMat, const glm::vec3& translate, const glm::vec3& scale, const glm::vec3& rotationEuler, const glm::vec3& color) {
+        glm::mat4 m = parentMat;
+        m = glm::translate(m, translate);
+        if (rotationEuler.x != 0.0f) m = glm::rotate(m, rotationEuler.x, glm::vec3(1.0f, 0.0f, 0.0f));
+        if (rotationEuler.y != 0.0f) m = glm::rotate(m, rotationEuler.y, glm::vec3(0.0f, 1.0f, 0.0f));
+        if (rotationEuler.z != 0.0f) m = glm::rotate(m, rotationEuler.z, glm::vec3(0.0f, 0.0f, 1.0f));
+        m = glm::scale(m, scale);
+        shader.setVec3("colorOverride", color);
+        renderer.renderWithLighting(*m_cubeMesh, shader, m);
+    };
 
-    // 3. Solar Panel Wings (two long solar panels, dark blue, rotated slightly for realism)
-    // Left Wing
-    glm::mat4 leftWingModel = modelBase;
-    leftWingModel = glm::translate(leftWingModel, glm::vec3(-0.0475f, 0.0f, 0.0f)); // offset from center along X
-    leftWingModel = glm::rotate(leftWingModel, glm::radians(15.0f), glm::vec3(1.0f, 0.0f, 0.0f)); // tilt
-    leftWingModel = glm::scale(leftWingModel, glm::vec3(0.025f, 0.001f, 0.012f)); // flat rectangle
-    shader.setVec3("colorOverride", glm::vec3(0.05f, 0.18f, 0.42f)); // dark blue
-    renderer.renderWithLighting(*m_cubeMesh, shader, leftWingModel);
+    // Color Palette
+    glm::vec3 whiteMod = glm::vec3(0.88f, 0.88f, 0.90f);
+    glm::vec3 greyMod = glm::vec3(0.60f, 0.62f, 0.65f);
+    glm::vec3 darkTruss = glm::vec3(0.35f, 0.35f, 0.38f);
+    glm::vec3 goldMetal = glm::vec3(0.85f, 0.65f, 0.18f);
+    glm::vec3 jointColor = glm::vec3(0.45f, 0.45f, 0.47f);
+    glm::vec3 darkBlue = glm::vec3(0.05f, 0.15f, 0.40f);
+    glm::vec3 gridColor = glm::vec3(0.02f, 0.02f, 0.03f);
 
-    // Right Wing
-    glm::mat4 rightWingModel = modelBase;
-    rightWingModel = glm::translate(rightWingModel, glm::vec3(0.0475f, 0.0f, 0.0f));
-    rightWingModel = glm::rotate(rightWingModel, glm::radians(15.0f), glm::vec3(1.0f, 0.0f, 0.0f));
-    rightWingModel = glm::scale(rightWingModel, glm::vec3(0.025f, 0.001f, 0.012f));
-    shader.setVec3("colorOverride", glm::vec3(0.05f, 0.18f, 0.42f));
-    renderer.renderWithLighting(*m_cubeMesh, shader, rightWingModel);
+    // =========================================================================
+    // 1. CENTRAL LONG TRUSS STRUCTURE
+    // =========================================================================
+    // Main structural spine (cube box along X)
+    renderCube(modelBase, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.14f, 0.004f, 0.004f), glm::vec3(0.0f), darkTruss);
+    
+    // Cross joints and reinforcement braces along the truss
+    for (float x = -0.05f; x <= 0.05f; x += 0.025f) {
+        renderCube(modelBase, glm::vec3(x, 0.0f, 0.0f), glm::vec3(0.003f, 0.006f, 0.006f), glm::vec3(0.0f), jointColor);
+        // Small diagonal beams
+        renderCube(modelBase, glm::vec3(x + 0.0125f, 0.0f, 0.0f), glm::vec3(0.001f, 0.005f, 0.005f), glm::vec3(0.0f, 0.0f, 0.785f), jointColor);
+    }
+    
+    // Truss extensions (left/right cylinders along X)
+    renderCylinder(modelBase, glm::vec3(-0.075f, 0.0f, 0.0f), glm::vec3(0.003f, 0.012f, 0.003f), glm::vec3(0.0f, 0.0f, 1.5708f), jointColor);
+    renderCylinder(modelBase, glm::vec3(0.075f, 0.0f, 0.0f), glm::vec3(0.003f, 0.012f, 0.003f), glm::vec3(0.0f, 0.0f, 1.5708f), jointColor);
 
-    // Solar wing connectors
-    // Left connector
-    glm::mat4 leftConn = modelBase;
-    leftConn = glm::translate(leftConn, glm::vec3(-0.035f, 0.0f, 0.0f));
-    leftConn = glm::rotate(leftConn, glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-    leftConn = glm::scale(leftConn, glm::vec3(0.003f, 0.010f, 0.003f));
-    shader.setVec3("colorOverride", glm::vec3(0.65f, 0.65f, 0.68f));
-    renderer.renderWithLighting(*m_cylinderMesh, shader, leftConn);
+    // =========================================================================
+    // 2. PRESSURIZED HABITATION AND LAB MODULES
+    // =========================================================================
+    // Translate down slightly to represent modules hanging from the central truss
+    glm::mat4 modulesBase = glm::translate(modelBase, glm::vec3(0.0f, -0.008f, 0.0f));
 
-    // Right connector
-    glm::mat4 rightConn = modelBase;
-    rightConn = glm::translate(rightConn, glm::vec3(0.035f, 0.0f, 0.0f));
-    rightConn = glm::rotate(rightConn, glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-    rightConn = glm::scale(rightConn, glm::vec3(0.003f, 0.010f, 0.003f));
-    shader.setVec3("colorOverride", glm::vec3(0.65f, 0.65f, 0.68f));
-    renderer.renderWithLighting(*m_cylinderMesh, shader, rightConn);
+    // A. Unity Node 1 (Central hub)
+    // Cylinder along Z (rotated 90 deg around X)
+    renderCylinder(modulesBase, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.011f, 0.014f, 0.011f), glm::vec3(1.5708f, 0.0f, 0.0f), greyMod);
 
-    // 4. Smaller side modules (pressurized laboratories Columbus, Kibo, etc.)
-    // Module 1: Sticking out along +Y
-    glm::mat4 mod1 = modelBase;
-    mod1 = glm::translate(mod1, glm::vec3(0.0f, 0.0075f, 0.012f));
-    mod1 = glm::scale(mod1, glm::vec3(0.009f, 0.015f, 0.009f));
-    shader.setVec3("colorOverride", glm::vec3(0.70f, 0.72f, 0.75f));
-    renderer.renderWithLighting(*m_cylinderMesh, shader, mod1);
+    // B. Destiny Laboratory (US Laboratory module, forward of Unity)
+    renderCylinder(modulesBase, glm::vec3(0.0f, 0.0f, 0.018f), glm::vec3(0.011f, 0.024f, 0.011f), glm::vec3(1.5708f, 0.0f, 0.0f), whiteMod);
 
-    // Module 2: Sticking out along -Y
-    glm::mat4 mod2 = modelBase;
-    mod2 = glm::translate(mod2, glm::vec3(0.0f, -0.0075f, -0.012f));
-    mod2 = glm::scale(mod2, glm::vec3(0.009f, 0.015f, 0.009f));
-    shader.setVec3("colorOverride", glm::vec3(0.70f, 0.72f, 0.75f));
-    renderer.renderWithLighting(*m_cylinderMesh, shader, mod2);
+    // C. Harmony Node 2 (Forward connecting node)
+    renderCylinder(modulesBase, glm::vec3(0.0f, 0.0f, 0.035f), glm::vec3(0.011f, 0.012f, 0.011f), glm::vec3(1.5708f, 0.0f, 0.0f), whiteMod);
 
-    // Module 3: Sticking out along -X
-    glm::mat4 mod3 = modelBase;
-    mod3 = glm::translate(mod3, glm::vec3(-0.012f, 0.0f, 0.0f));
-    mod3 = glm::rotate(mod3, glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-    mod3 = glm::scale(mod3, glm::vec3(0.008f, 0.012f, 0.008f));
-    shader.setVec3("colorOverride", glm::vec3(0.68f, 0.70f, 0.73f));
-    renderer.renderWithLighting(*m_cylinderMesh, shader, mod3);
+    // D. Columbus Laboratory (ESA module, starboard of Node 2)
+    renderCylinder(modulesBase, glm::vec3(0.013f, 0.0f, 0.035f), glm::vec3(0.010f, 0.016f, 0.010f), glm::vec3(0.0f, 0.0f, 1.5708f), whiteMod);
 
-    // 5. Antenna and Docking Arm (Canadarm2 robotic arm and communication array)
-    // Docking arm Part A
-    glm::mat4 armPartA = modelBase;
-    armPartA = glm::translate(armPartA, glm::vec3(0.0f, -0.006f, 0.010f));
-    armPartA = glm::rotate(armPartA, glm::radians(30.0f), glm::vec3(1.0f, 0.0f, 0.0f));
-    armPartA = glm::translate(armPartA, glm::vec3(0.0f, -0.006f, 0.0f));
-    armPartA = glm::scale(armPartA, glm::vec3(0.002f, 0.012f, 0.002f));
-    shader.setVec3("colorOverride", glm::vec3(0.85f, 0.85f, 0.85f)); // white arm
-    renderer.renderWithLighting(*m_cylinderMesh, shader, armPartA);
+    // E. Kibo Laboratory (JAXA module, port of Node 2)
+    renderCylinder(modulesBase, glm::vec3(-0.015f, 0.0f, 0.035f), glm::vec3(0.010f, 0.022f, 0.010f), glm::vec3(0.0f, 0.0f, 1.5708f), whiteMod);
+    // Kibo exposed facility porch (small flat tray)
+    renderCube(modulesBase, glm::vec3(-0.030f, -0.002f, 0.035f), glm::vec3(0.008f, 0.002f, 0.010f), glm::vec3(0.0f), greyMod);
 
-    // Docking arm Part B
-    glm::mat4 armPartB = modelBase;
-    armPartB = glm::translate(armPartB, glm::vec3(0.0f, -0.006f, 0.010f));
-    armPartB = glm::rotate(armPartB, glm::radians(30.0f), glm::vec3(1.0f, 0.0f, 0.0f));
-    armPartB = glm::translate(armPartB, glm::vec3(0.0f, -0.012f, 0.0f));
-    armPartB = glm::rotate(armPartB, glm::radians(-60.0f), glm::vec3(1.0f, 0.0f, 0.0f));
-    armPartB = glm::translate(armPartB, glm::vec3(0.0f, -0.005f, 0.0f));
-    armPartB = glm::scale(armPartB, glm::vec3(0.002f, 0.010f, 0.002f));
-    shader.setVec3("colorOverride", glm::vec3(0.85f, 0.85f, 0.85f));
-    renderer.renderWithLighting(*m_cylinderMesh, shader, armPartB);
+    // F. Quest Joint Airlock (Starboard of Unity Node 1)
+    renderCylinder(modulesBase, glm::vec3(0.010f, 0.0f, 0.0f), glm::vec3(0.008f, 0.010f, 0.008f), glm::vec3(0.0f, 0.0f, 1.5708f), whiteMod);
+    // Outer gas tanks (small gold spheres/cylinders)
+    renderCylinder(modulesBase, glm::vec3(0.010f, 0.005f, 0.003f), glm::vec3(0.003f, 0.004f, 0.003f), glm::vec3(0.0f), goldMetal);
+    renderCylinder(modulesBase, glm::vec3(0.010f, -0.005f, -0.003f), glm::vec3(0.003f, 0.004f, 0.003f), glm::vec3(0.0f), goldMetal);
 
-    // Antenna Mast
-    glm::mat4 antennaMast = modelBase;
-    antennaMast = glm::translate(antennaMast, glm::vec3(0.0f, 0.006f + 0.0075f, -0.015f));
-    antennaMast = glm::scale(antennaMast, glm::vec3(0.001f, 0.015f, 0.001f));
-    shader.setVec3("colorOverride", glm::vec3(0.80f, 0.80f, 0.80f));
-    renderer.renderWithLighting(*m_cylinderMesh, shader, antennaMast);
+    // G. Tranquility Node 3 (Port of Unity Node 1)
+    renderCylinder(modulesBase, glm::vec3(-0.010f, 0.0f, 0.0f), glm::vec3(0.011f, 0.012f, 0.011f), glm::vec3(0.0f, 0.0f, 1.5708f), whiteMod);
+    
+    // H. Cupola (Earth-facing observatory, nadir of Tranquility)
+    renderCylinder(modulesBase, glm::vec3(-0.010f, -0.007f, 0.0f), glm::vec3(0.006f, 0.004f, 0.006f), glm::vec3(0.0f), jointColor);
 
-    // Antenna Dish
-    glm::mat4 antennaDish = modelBase;
-    antennaDish = glm::translate(antennaDish, glm::vec3(0.0f, 0.006f + 0.015f, -0.015f));
-    antennaDish = glm::scale(antennaDish, glm::vec3(0.006f, 0.001f, 0.006f));
-    shader.setVec3("colorOverride", glm::vec3(0.85f, 0.70f, 0.20f)); // golden dish
-    renderer.renderWithLighting(*m_cylinderMesh, shader, antennaDish);
+    // I. Zarya FGB (Russian Cargo Module, aft of Unity Node 1)
+    renderCylinder(modulesBase, glm::vec3(0.0f, 0.0f, -0.018f), glm::vec3(0.011f, 0.024f, 0.011f), glm::vec3(1.5708f, 0.0f, 0.0f), greyMod);
+    // Gold band details representing thermal blankets
+    renderCylinder(modulesBase, glm::vec3(0.0f, 0.0f, -0.018f), glm::vec3(0.0115f, 0.003f, 0.0115f), glm::vec3(1.5708f, 0.0f, 0.0f), goldMetal);
 
+    // J. Zvezda Service Module (Russian habitation module, aft-most)
+    renderCylinder(modulesBase, glm::vec3(0.0f, 0.0f, -0.041f), glm::vec3(0.010f, 0.024f, 0.010f), glm::vec3(1.5708f, 0.0f, 0.0f), greyMod);
+    // Zvezda's small local solar panels
+    renderCube(modulesBase, glm::vec3(-0.022f, 0.0f, -0.041f), glm::vec3(0.015f, 0.0003f, 0.005f), glm::vec3(0.0f, 0.0f, 0.08f), darkBlue);
+    renderCube(modulesBase, glm::vec3(0.022f, 0.0f, -0.041f), glm::vec3(0.015f, 0.0003f, 0.005f), glm::vec3(0.0f, 0.0f, -0.08f), darkBlue);
+
+    // =========================================================================
+    // 3. SOLAR ARRAY WINGS (SAW) - 4 LARGE RECTANGULAR ARRAYS
+    // =========================================================================
+    // Render the four major arrays (two left, two right)
+    auto renderSolarArrayWing = [&](float xOffset, bool isLeft) {
+        // Joint connector from truss to array
+        renderCylinder(modelBase, glm::vec3(xOffset, 0.0f, 0.0f), glm::vec3(0.003f, 0.006f, 0.003f), glm::vec3(1.5708f, 0.0f, 0.0f), jointColor);
+
+        // Central structural mast (golden-brown truss line running out along Z)
+        renderCylinder(modelBase, glm::vec3(xOffset, 0.0f, 0.0f), glm::vec3(0.0012f, 0.076f, 0.0012f), glm::vec3(1.5708f, 0.0f, 0.0f), goldMetal);
+
+        // Slow panel rotation to track simulated sunlight (rotating around the mast axis)
+        float panelRot = m_time * 0.15f + (isLeft ? 0.0f : 1.57f);
+
+        glm::mat4 panelBase = glm::translate(modelBase, glm::vec3(xOffset, 0.0f, 0.0f));
+        panelBase = glm::rotate(panelBase, panelRot, glm::vec3(0.0f, 0.0f, 1.0f));
+
+        // Two solar blanket panels extending along +Z and -Z from center mast
+        // Blanket 1 (+Z): centered at Z = 0.020f, size X = 0.016f, Y = 0.0004f, Z = 0.034f
+        renderCube(panelBase, glm::vec3(0.0f, 0.0f, 0.020f), glm::vec3(0.016f, 0.0004f, 0.034f), glm::vec3(0.0f), darkBlue);
+        // Blanket 2 (-Z): centered at Z = -0.020f, size X = 0.016f, Y = 0.0004f, Z = 0.034f
+        renderCube(panelBase, glm::vec3(0.0f, 0.0f, -0.020f), glm::vec3(0.016f, 0.0004f, 0.034f), glm::vec3(0.0f), darkBlue);
+
+        // Grid lines (thin black decal boxes placed slightly above & below blanket surfaces)
+        float yOffset = 0.00025f;
+        for (int side = -1; side <= 1; side += 2) {
+            float y = side * yOffset;
+
+            // Blanket 1 Grid Lines
+            // Center separator (vertical along Z)
+            renderCube(panelBase, glm::vec3(0.0f, y, 0.020f), glm::vec3(0.0008f, 0.0001f, 0.034f), glm::vec3(0.0f), gridColor);
+            // Horizontal segment lines (along X)
+            for (float zVal = 0.006f; zVal <= 0.035f; zVal += 0.007f) {
+                renderCube(panelBase, glm::vec3(0.0f, y, zVal), glm::vec3(0.016f, 0.0001f, 0.0006f), glm::vec3(0.0f), gridColor);
+            }
+
+            // Blanket 2 Grid Lines
+            // Center separator (vertical along Z)
+            renderCube(panelBase, glm::vec3(0.0f, y, -0.020f), glm::vec3(0.0008f, 0.0001f, 0.034f), glm::vec3(0.0f), gridColor);
+            // Horizontal segment lines (along X)
+            for (float zVal = -0.006f; zVal >= -0.035f; zVal -= 0.007f) {
+                renderCube(panelBase, glm::vec3(0.0f, y, zVal), glm::vec3(0.016f, 0.0001f, 0.0006f), glm::vec3(0.0f), gridColor);
+            }
+        }
+    };
+
+    // Render the 4 wings:
+    renderSolarArrayWing(-0.082f, true);  // Left Outer
+    renderSolarArrayWing(-0.058f, true);  // Left Inner
+    renderSolarArrayWing(0.058f, false);  // Right Inner
+    renderSolarArrayWing(0.082f, false);  // Right Outer
+
+    // =========================================================================
+    // 4. DOCKED SOYUZ CREW VEHICLE
+    // =========================================================================
+    // Docked at the aft port of the Zvezda module (Z = -0.053f relative to modulesBase)
+    glm::mat4 soyuzBase = glm::translate(modulesBase, glm::vec3(0.0f, 0.0f, -0.054f));
+
+    // Docking probe connector
+    renderCylinder(soyuzBase, glm::vec3(0.0f, 0.0f, -0.001f), glm::vec3(0.003f, 0.002f, 0.003f), glm::vec3(1.5708f, 0.0f, 0.0f), jointColor);
+    // Spherical Orbital Module
+    renderCylinder(soyuzBase, glm::vec3(0.0f, 0.0f, -0.004f), glm::vec3(0.005f, 0.004f, 0.005f), glm::vec3(1.5708f, 0.0f, 0.0f), greyMod);
+    // Bell-shaped Descent Module (dark greenish grey)
+    renderCylinder(soyuzBase, glm::vec3(0.0f, 0.0f, -0.0075f), glm::vec3(0.0055f, 0.0035f, 0.0055f), glm::vec3(1.5708f, 0.0f, 0.0f), glm::vec3(0.32f, 0.40f, 0.32f));
+    // Instrument/Service Module (grey cylinder)
+    renderCylinder(soyuzBase, glm::vec3(0.0f, 0.0f, -0.0125f), glm::vec3(0.006f, 0.006f, 0.006f), glm::vec3(1.5708f, 0.0f, 0.0f), greyMod);
+    // Service Module flared base
+    renderCylinder(soyuzBase, glm::vec3(0.0f, 0.0f, -0.016f), glm::vec3(0.007f, 0.002f, 0.007f), glm::vec3(1.5708f, 0.0f, 0.0f), jointColor);
+    // Two small Soyuz solar panel wings extending port & starboard (along X-axis)
+    renderCube(soyuzBase, glm::vec3(-0.012f, 0.0f, -0.0125f), glm::vec3(0.015f, 0.0002f, 0.004f), glm::vec3(0.0f), darkBlue);
+    renderCube(soyuzBase, glm::vec3(0.012f, 0.0f, -0.0125f), glm::vec3(0.015f, 0.0002f, 0.004f), glm::vec3(0.0f), darkBlue);
+
+    // =========================================================================
+    // 5. CANADARM2 ROBOTIC ARM
+    // =========================================================================
+    // Mounted on US Lab Destiny (modulesBase, Z = 0.018f, top-port side)
+    glm::mat4 armBase = glm::translate(modulesBase, glm::vec3(-0.006f, 0.005f, 0.018f));
+    // Rotate elbow joint based on time for dynamic articulation
+    float elbowAngle = glm::radians(-75.0f) + 0.15f * std::sin(m_time * 0.4f);
+    
+    // Joint base
+    renderCube(armBase, glm::vec3(0.0f), glm::vec3(0.003f, 0.003f, 0.003f), glm::vec3(0.0f), jointColor);
+    
+    // Link 1 (Lower arm boom): points up & slightly left
+    glm::mat4 link1 = armBase;
+    link1 = glm::rotate(link1, glm::radians(35.0f), glm::vec3(0.0f, 0.0f, 1.0f)); // shoulder roll
+    link1 = glm::rotate(link1, glm::radians(20.0f), glm::vec3(1.0f, 0.0f, 0.0f)); // shoulder pitch
+    renderCylinder(link1, glm::vec3(0.0f, 0.006f, 0.0f), glm::vec3(0.001f, 0.012f, 0.001f), glm::vec3(0.0f), whiteMod);
+
+    // Elbow Joint
+    glm::mat4 elbowMat = glm::translate(link1, glm::vec3(0.0f, 0.012f, 0.0f));
+    renderCylinder(elbowMat, glm::vec3(0.0f), glm::vec3(0.0018f, 0.0018f, 0.0018f), glm::vec3(1.5708f, 0.0f, 0.0f), jointColor);
+
+    // Link 2 (Upper arm boom): bent relative to link 1
+    glm::mat4 link2 = glm::rotate(elbowMat, elbowAngle, glm::vec3(1.0f, 0.0f, 0.0f));
+    renderCylinder(link2, glm::vec3(0.0f, 0.005f, 0.0f), glm::vec3(0.001f, 0.010f, 0.001f), glm::vec3(0.0f), whiteMod);
+
+    // End effector gripper
+    renderCylinder(link2, glm::vec3(0.0f, 0.0105f, 0.0f), glm::vec3(0.0014f, 0.0015f, 0.0014f), glm::vec3(0.0f), jointColor);
+
+    // =========================================================================
+    // 6. COMMUNICATION ANTENNA ARRAY
+    // =========================================================================
+    // Attached on top of Zvezda module
+    glm::mat4 antBase = glm::translate(modulesBase, glm::vec3(0.0f, 0.005f, -0.045f));
+    
+    // Antenna boom mast pointing up and aft
+    glm::mat4 antMast = antBase;
+    antMast = glm::rotate(antMast, glm::radians(30.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+    renderCylinder(antMast, glm::vec3(0.0f, 0.006f, 0.0f), glm::vec3(0.0008f, 0.012f, 0.0008f), glm::vec3(0.0f), jointColor);
+
+    // Dish mount
+    glm::mat4 antDishPivot = glm::translate(antMast, glm::vec3(0.0f, 0.012f, 0.0f));
+    renderCylinder(antDishPivot, glm::vec3(0.0f), glm::vec3(0.0015f, 0.0015f, 0.0015f), glm::vec3(0.0f, 0.0f, 1.5708f), jointColor);
+
+    // Gold Antenna Dish
+    glm::mat4 antDish = glm::rotate(antDishPivot, glm::radians(-60.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+    renderCylinder(antDish, glm::vec3(0.0f, 0.0006f, 0.0f), glm::vec3(0.007f, 0.0006f, 0.007f), glm::vec3(0.0f), goldMetal);
+
+    // Restore shader states
     shader.setBool("useColorOverride", false);
 }
 
@@ -219,7 +346,7 @@ Mesh SpaceStation::createUnitCylinder(unsigned int segments) {
     float halfHeight = 0.5f;
     float radius = 0.5f; // diameter = 1.0
 
-    // 1. Side wall vertices (double for sharp normals and textures)
+    // 1. Side wall vertices
     for (unsigned int i = 0; i <= segments; ++i) {
         float angle = 2.0f * PI * i / segments;
         float x = std::cos(angle);

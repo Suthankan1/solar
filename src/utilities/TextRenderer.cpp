@@ -93,7 +93,45 @@ void TextRenderer::renderText(const std::string& text, float x, float y, float s
     glBindVertexArray(m_VAO);
     glBindBuffer(GL_ARRAY_BUFFER, m_VBO);
 
-    float currentX = x;
+    // Draw shadow first
+    float shadowOffset = 1.0f * scale;
+    m_shader->setVec4("textColor", glm::vec4(0.0f, 0.0f, 0.0f, color.a));
+    float currentX = x + shadowOffset;
+    float shadowY = y - shadowOffset;
+    for (char c : text) {
+        int charIdx = static_cast<unsigned char>(c);
+        if (charIdx < 0 || charIdx >= 128) {
+            charIdx = 32; // Default to space
+        }
+
+        // Texture atlas coordinates: width is 1024, each glyph spans 8 pixels
+        float u0 = (charIdx * 8.0f) / 1024.0f;
+        float u1 = (charIdx * 8.0f + 8.0f) / 1024.0f;
+
+        float w = 8.0f * scale;
+        float h = 8.0f * scale;
+
+        // Triangles quad representation: position.xy, texcoords.zw
+        float vertices[6][4] = {
+            { currentX,     shadowY + h,   u0, 1.0f },
+            { currentX,     shadowY,       u0, 0.0f },
+            { currentX + w, shadowY,       u1, 0.0f },
+
+            { currentX,     shadowY + h,   u0, 1.0f },
+            { currentX + w, shadowY,       u1, 0.0f },
+            { currentX + w, shadowY + h,   u1, 1.0f }
+        };
+
+        glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vertices), vertices);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+
+        // Advance cursor position
+        currentX += w;
+    }
+
+    // Now draw colored text on top
+    m_shader->setVec4("textColor", color);
+    currentX = x;
     for (char c : text) {
         int charIdx = static_cast<unsigned char>(c);
         if (charIdx < 0 || charIdx >= 128) {

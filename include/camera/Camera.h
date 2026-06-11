@@ -4,6 +4,28 @@
 #include <glm/glm.hpp>
 #include <memory>
 
+namespace CameraHelpers {
+    /**
+     * @brief Performs Catmull-Rom spline interpolation.
+     * @param p0 Control point 0 (start tangent helper)
+     * @param p1 Control point 1 (start position at t=0)
+     * @param p2 Control point 2 (end position at t=1)
+     * @param p3 Control point 3 (end tangent helper)
+     * @param t Interpolation factor in range [0, 1]
+     */
+    inline glm::vec3 interpolateCatmullRom(const glm::vec3& p0, const glm::vec3& p1, const glm::vec3& p2, const glm::vec3& p3, float t) {
+        float t2 = t * t;
+        float t3 = t2 * t;
+        return 0.5f * (
+            (2.0f * p1) +
+            (-p0 + p2) * t +
+            (2.0f * p0 - 5.0f * p1 + 4.0f * p2 - p3) * t2 +
+            (-p0 + 3.0f * p1 - 3.0f * p2 + p3) * t3
+        );
+    }
+}
+
+
 class Camera : public SceneObject {
 public:
     Camera(const std::string& name, const glm::vec3& position, const glm::vec3& target, const glm::vec3& up = glm::vec3(0.0f, 1.0f, 0.0f));

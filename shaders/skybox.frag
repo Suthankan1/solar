@@ -59,33 +59,31 @@ void main() {
 
     vec3 dir = normalize(TexCoords);
 
-    // Nebula layers with slow, drifting motion
-    vec3 nebulaDir1 = dir + vec3(time * 0.004, time * 0.002, time * 0.001);
-    vec3 nebulaDir2 = dir * 1.5 - vec3(time * 0.001, time * 0.003, -time * 0.002);
-    vec3 nebulaDir3 = dir * 2.2 + vec3(-time * 0.002, time * 0.001, time * 0.004);
+    // Nebula layers with slow, drifting motion (made slower and more organic)
+    vec3 nebulaDir1 = dir + vec3(time * 0.002, time * 0.001, time * 0.0005);
+    vec3 nebulaDir2 = dir * 1.5 - vec3(time * 0.0005, time * 0.0015, -time * 0.001);
+    vec3 nebulaDir3 = dir * 2.2 + vec3(-time * 0.001, time * 0.0005, time * 0.002);
 
-    float n1 = fbm(nebulaDir1 * 2.5);
-    float n2 = fbm(nebulaDir2 * 3.0);
-    float n3 = fbm(nebulaDir3 * 1.8);
+    float n1 = fbm(nebulaDir1 * 2.0);
+    float n2 = fbm(nebulaDir2 * 2.5);
+    float n3 = fbm(nebulaDir3 * 1.5);
 
-    // Color Palette for deep space
-    vec3 spaceBg = vec3(0.015, 0.015, 0.03);    // Near-black deep navy background
-    vec3 nebulaBlue = vec3(0.05, 0.15, 0.45);    // Deep cosmic blue gas
-    vec3 nebulaPurple = vec3(0.35, 0.08, 0.45);  // Deep space purple/magenta gas
-    vec3 nebulaTeal = vec3(0.02, 0.25, 0.22);    // Subtle teal dust cloud
+    // Dark realistic color palette for deep space (almost black, very subtle colors)
+    vec3 spaceBg = vec3(0.001, 0.0015, 0.003);    // Deep dark void
+    vec3 nebulaBlue = vec3(0.01, 0.03, 0.12);     // Very faint cosmic blue dust
+    vec3 nebulaPurple = vec3(0.06, 0.02, 0.08);   // Very faint cosmic purple dust
+    vec3 nebulaTeal = vec3(0.005, 0.04, 0.03);    // Very faint cosmic teal dust
 
     // Accumulate colors
     vec3 finalColor = spaceBg;
-    finalColor += nebulaBlue * pow(n1, 1.5) * 0.7;
-    finalColor += nebulaPurple * pow(n2, 1.8) * 0.6;
-    finalColor += nebulaTeal * pow(n3, 2.0) * 0.3;
+    finalColor += nebulaBlue * pow(n1, 2.5) * 0.6;
+    finalColor += nebulaPurple * pow(n2, 2.8) * 0.5;
+    finalColor += nebulaTeal * pow(n3, 3.0) * 0.35;
 
-    // Twinkling stars (asynchronous twinkle frequency per star based on hash of position)
-    float starPosHash = hash(floor(dir * 180.0));
-    float twinkle = 0.55 + 0.45 * sin(time * (1.5 + starPosHash * 2.0) + starPosHash * 6.28);
-    float s = stars(dir) * twinkle;
+    // Faint unresolved background galaxies (extremely tiny, static pinpoints)
+    float n_star = noise(dir * 300.0);
+    float s = pow(max(n_star - 0.85, 0.0) * 6.6, 12.0) * 0.08; // extremely faint and small
 
-    // Add stars to nebula final color
     finalColor += vec3(s);
 
     FragColor = vec4(finalColor, 1.0);

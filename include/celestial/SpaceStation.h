@@ -30,6 +30,8 @@ public:
     glm::vec3 getPosition() const { return glm::vec3(m_transform.getModelMatrix()[3]); }
     float getOrbitRadius() const { return m_orbitRadius; }
 
+    glm::vec3 getCloseUpTargetPoint() const;
+
     Transform& getTransform() { return m_transform; }
     const Transform& getTransform() const { return m_transform; }
 
@@ -39,6 +41,7 @@ private:
     std::shared_ptr<Planet> m_parentPlanet;
 
     float m_orbitAngle;
+    float m_time = 0.0f;
     Transform m_transform;
 
     // Shared primitive shapes to assemble the station

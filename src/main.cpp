@@ -73,6 +73,21 @@ enum class DemoStage {
     CREDITS
 };
 
+float UI_SCALE = 1.35f;
+
+// Project 3D world position to 2D screen position
+static bool projectWorldToScreen(const glm::vec3& worldPos, const glm::mat4& view, const glm::mat4& projection, int width, int height, glm::vec2& screenPos) {
+    glm::vec4 clipSpacePos = projection * view * glm::vec4(worldPos, 1.0f);
+    if (clipSpacePos.w <= 0.0f) return false; // Behind camera
+    
+    glm::vec3 ndcSpacePos = glm::vec3(clipSpacePos) / clipSpacePos.w;
+    
+    // Map NDC [-1, 1] to screen coordinates [0, width] and [0, height]
+    screenPos.x = (ndcSpacePos.x + 1.0f) * 0.5f * width;
+    screenPos.y = (ndcSpacePos.y + 1.0f) * 0.5f * height; // Y is 0 at bottom in TextRenderer
+    return true;
+}
+
 int main() {
     try {
         std::cout << "Starting Modern OpenGL Solar System Application...\n";
@@ -103,27 +118,27 @@ int main() {
         // Central Sun
         auto sun = std::make_shared<Sun>("Sun", 1.2f, glm::vec3(1.0f, 0.65f, 0.0f), glm::vec3(1.0f, 0.95f, 0.8f), "textures/sun.jpg");
         auto sunHalo = std::make_shared<SunHalo>("SunHalo", 1.3f, 2.8f);
-        // Create Planets (name, radius, orbitRadius, orbitSpeed, rotationSpeed, color)
-        auto mercury = std::make_shared<Planet>("Mercury", 0.08f, 2.0f, 1.6f, 3.0f, glm::vec3(0.76f, 0.70f, 0.65f), "textures/mercury.jpg");
-        auto venus = std::make_shared<Planet>("Venus", 0.15f, 2.8f, 1.1f, 0.4f, glm::vec3(0.95f, 0.85f, 0.55f), "textures/venus.jpg");
-        auto earth = std::make_shared<Planet>("Earth", 0.18f, 3.8f, 0.9f, 1.8f, glm::vec3(0.25f, 0.55f, 0.95f), "textures/earth.jpg");
-        auto mars = std::make_shared<Planet>("Mars", 0.12f, 5.0f, 0.7f, 1.7f, glm::vec3(0.80f, 0.35f, 0.20f), "textures/mars.jpg");
+        // Create Planets (name, radius, semiMajorAxis, semiMinorAxis, inclination, orbitSpeed, rotationSpeed, color, texturePath, orbitPhaseOffset, longitudeOfAscendingNode)
+        auto mercury = std::make_shared<Planet>("Mercury", 0.08f, 2.0f, 1.75f, 7.0f, 1.6f, 3.0f, glm::vec3(0.76f, 0.70f, 0.65f), "textures/mercury.jpg", 0.5f, 48.3f);
+        auto venus = std::make_shared<Planet>("Venus", 0.15f, 2.8f, 2.795f, 3.4f, 1.1f, 0.4f, glm::vec3(0.95f, 0.85f, 0.55f), "textures/venus.jpg", 1.2f, 76.7f);
+        auto earth = std::make_shared<Planet>("Earth", 0.18f, 3.8f, 3.76f, 0.0f, 0.9f, 1.8f, glm::vec3(0.25f, 0.55f, 0.95f), "textures/earth.jpg", 0.0f, 0.0f);
+        auto mars = std::make_shared<Planet>("Mars", 0.12f, 5.0f, 4.75f, 1.85f, 0.7f, 1.7f, glm::vec3(0.80f, 0.35f, 0.20f), "textures/mars.jpg", 2.4f, 49.6f);
         auto asteroidBelt = std::make_shared<AsteroidBelt>("AsteroidBelt", 5.6f, 6.4f, 2000);
-        auto jupiter = std::make_shared<Planet>("Jupiter", 0.42f, 7.0f, 0.4f, 2.5f, glm::vec3(0.85f, 0.72f, 0.58f), "textures/jupiter.jpg");
-        auto saturn = std::make_shared<Planet>("Saturn", 0.36f, 9.5f, 0.3f, 2.2f, glm::vec3(0.92f, 0.86f, 0.65f), "textures/saturn.jpg");
+        auto jupiter = std::make_shared<Planet>("Jupiter", 0.42f, 7.0f, 6.85f, 1.3f, 0.4f, 2.5f, glm::vec3(0.85f, 0.72f, 0.58f), "textures/jupiter.jpg", 3.8f, 100.5f);
+        auto saturn = std::make_shared<Planet>("Saturn", 0.36f, 9.5f, 9.3f, 2.48f, 0.3f, 2.2f, glm::vec3(0.92f, 0.86f, 0.65f), "textures/saturn.jpg", 4.5f, 113.7f);
         auto saturnRings = std::make_shared<SaturnRings>("SaturnRings", saturn);
-        auto uranus = std::make_shared<Planet>("Uranus", 0.25f, 11.5f, 0.2f, 1.4f, glm::vec3(0.55f, 0.85f, 0.90f), "textures/uranus.jpg");
-        auto neptune = std::make_shared<Planet>("Neptune", 0.23f, 13.5f, 0.15f, 1.5f, glm::vec3(0.25f, 0.40f, 0.95f), "textures/neptune.jpg");
+        auto uranus = std::make_shared<Planet>("Uranus", 0.25f, 11.5f, 11.3f, 0.77f, 0.2f, 1.4f, glm::vec3(0.55f, 0.85f, 0.90f), "textures/uranus.jpg", 5.1f, 74.0f);
+        auto neptune = std::make_shared<Planet>("Neptune", 0.23f, 13.5f, 13.3f, 1.77f, 0.15f, 1.5f, glm::vec3(0.25f, 0.40f, 0.95f), "textures/neptune.jpg", 1.8f, 131.8f);
 
-        // Create Orbit Rings (name + "Orbit", radius, color, parent)
-        auto mercuryOrbit = std::make_shared<Orbit>("MercuryOrbit", mercury->getOrbitRadius(), glm::vec3(0.4f, 0.38f, 0.36f), nullptr);
-        auto venusOrbit = std::make_shared<Orbit>("VenusOrbit", venus->getOrbitRadius(), glm::vec3(0.5f, 0.45f, 0.30f), nullptr);
-        auto earthOrbit = std::make_shared<Orbit>("EarthOrbit", earth->getOrbitRadius(), glm::vec3(0.15f, 0.30f, 0.55f), nullptr);
-        auto marsOrbit = std::make_shared<Orbit>("MarsOrbit", mars->getOrbitRadius(), glm::vec3(0.45f, 0.20f, 0.12f), nullptr);
-        auto jupiterOrbit = std::make_shared<Orbit>("JupiterOrbit", jupiter->getOrbitRadius(), glm::vec3(0.45f, 0.38f, 0.30f), nullptr);
-        auto saturnOrbit = std::make_shared<Orbit>("SaturnOrbit", saturn->getOrbitRadius(), glm::vec3(0.48f, 0.44f, 0.33f), nullptr);
-        auto uranusOrbit = std::make_shared<Orbit>("UranusOrbit", uranus->getOrbitRadius(), glm::vec3(0.28f, 0.42f, 0.46f), nullptr);
-        auto neptuneOrbit = std::make_shared<Orbit>("NeptuneOrbit", neptune->getOrbitRadius(), glm::vec3(0.12f, 0.20f, 0.48f), nullptr);
+        // Create Orbit Rings (name + "Orbit", planet, color, parent)
+        auto mercuryOrbit = std::make_shared<Orbit>("MercuryOrbit", mercury, glm::vec3(0.4f, 0.38f, 0.36f), nullptr);
+        auto venusOrbit = std::make_shared<Orbit>("VenusOrbit", venus, glm::vec3(0.5f, 0.45f, 0.30f), nullptr);
+        auto earthOrbit = std::make_shared<Orbit>("EarthOrbit", earth, glm::vec3(0.15f, 0.30f, 0.55f), nullptr);
+        auto marsOrbit = std::make_shared<Orbit>("MarsOrbit", mars, glm::vec3(0.45f, 0.20f, 0.12f), nullptr);
+        auto jupiterOrbit = std::make_shared<Orbit>("JupiterOrbit", jupiter, glm::vec3(0.45f, 0.38f, 0.30f), nullptr);
+        auto saturnOrbit = std::make_shared<Orbit>("SaturnOrbit", saturn, glm::vec3(0.48f, 0.44f, 0.33f), nullptr);
+        auto uranusOrbit = std::make_shared<Orbit>("UranusOrbit", uranus, glm::vec3(0.28f, 0.42f, 0.46f), nullptr);
+        auto neptuneOrbit = std::make_shared<Orbit>("NeptuneOrbit", neptune, glm::vec3(0.12f, 0.20f, 0.48f), nullptr);
 
         // Create Moons (name, radius, orbitRadius, orbitSpeed, rotationSpeed, color, parentPlanet)
         auto moon = std::make_shared<Moon>("Moon", 0.06f, 0.38f, 2.5f, 1.2f, glm::vec3(0.75f, 0.75f, 0.72f), earth, "textures/moon.jpg");
@@ -176,12 +191,12 @@ int main() {
         sceneManager.registerObject(earthClouds);
         sceneManager.registerObject(earthAtmosphere);
 
-        // 3. Create Skybox Background
-        auto starfield = std::make_shared<Starfield>("Starfield", 3000, 80.0f);
-        sceneManager.registerObject(starfield);
-
+        // 3. Create Skybox Background (Skybox is registered BEFORE Starfield so it renders behind it)
         auto skybox = std::make_shared<Skybox>("Skybox");
         sceneManager.registerObject(skybox);
+
+        auto starfield = std::make_shared<Starfield>("Starfield", 3000, 80.0f);
+        sceneManager.registerObject(starfield);
 
         // 4. Create and Register Cameras
         auto sysCamera = std::make_shared<StaticCamera>("SystemCamera", glm::vec3(0.0f, 6.5f, 9.5f), glm::vec3(0.0f, 0.0f, 0.0f));
@@ -222,10 +237,16 @@ int main() {
         bool bWasPressed = false;
         bool enterWasPressed = false;
 
+        bool bloomEnabled = true;
+        bool gWasPressed = false;
+
         DemoStage currentDemo = DemoStage::NONE;
         float demoTimer = 0.0f;
         bool f1WasPressed = false;
         bool demoPaused = false;
+        bool letterboxActive = true;
+        bool lWasPressed = false;
+
 
         std::shared_ptr<Camera> cameraBeforeDemo = nullptr;
         int cursorModeBeforeDemo = GLFW_CURSOR_NORMAL;
@@ -241,108 +262,195 @@ int main() {
             float duration;
             std::string title;
             std::string explanation;
+            std::string concept;
             std::string highlight;
             float speed;
+            glm::vec3 pos0, pos1, pos2, pos3;
+            glm::vec3 look0, look1, look2, look3;
         };
 
         std::vector<DemoSubStage> subStages = {
-            { DemoStage::OPENING_WIDE,   "Opening",                     0.0f,   15.0f, "Realistic Solar System Explorer", "An interactive OpenGL simulation of our celestial neighborhood, showcasing orbits, textures, lighting, and spacecraft.", "",             1.0f },
-            { DemoStage::SUN_ZOOM,       "Sun Zoom",                   15.0f,   20.0f, "Sun: Dynamic light source",        "The central star. Animates with a procedural halo glow and serves as the primary point light source for the system.", "Sun",        1.0f },
-            { DemoStage::INNER_PLANETS,  "Mercury View",               35.0f,    6.0f, "Inner Planets: Mercury",           "The smallest and closest planet to the Sun, orbiting at high speed in a scorched environment.", "Mercury",    2.5f },
-            { DemoStage::INNER_PLANETS,  "Venus View",                 41.0f,    6.0f, "Inner Planets: Venus",             "Earth's sister planet, shrouded in a dense, reflective atmosphere with extreme greenhouse temperatures.", "Venus",      2.2f },
-            { DemoStage::INNER_PLANETS,  "Earth View",                 47.0f,    6.0f, "Inner Planets: Earth",             "Our home planet. The only known world hosting liquid surface water and life.", "Earth",      2.0f },
-            { DemoStage::INNER_PLANETS,  "Mars View",                  53.0f,    7.0f, "Inner Planets: Mars",              "The Red Planet, featuring iron-rich soil, polar ice caps, and the solar system's tallest volcano.", "Mars",       2.0f },
-            { DemoStage::EARTH_MOON,     "Earth & Moon",               60.0f,   20.0f, "Earth, Moon & Atmosphere",         "Rendered with a multi-layered atmospheric scattering glow and a separate, slowly rotating, semi-transparent cloud layer.", "Earth",     1.0f },
-            { DemoStage::SPACE_STATION,  "Space Station Orbit",        80.0f,   20.0f, "International Space Station",      "A human-made modular spacecraft orbiting Earth, assembled from cylinders, solar panels, and metallic trusses.", "SpaceStation", 2.2f },
-            { DemoStage::SPACECRAFT,     "Spacecraft Mission",        100.0f,   25.0f, "Interplanetary Spacecraft Mission","Following an astronaut spacecraft executing a Hohmann transfer trajectory from Earth to Mars.", "Spacecraft", 1.5f },
-            { DemoStage::ASTEROID_BELT,  "Asteroid Belt",             125.0f,   20.0f, "Asteroid Belt Fly-through",        "An annular region between Mars and Jupiter filled with thousands of rocky bodies orbiting the Sun.", "AsteroidBelt", 1.2f },
-            { DemoStage::JUPITER_SATURN, "Jupiter View",              145.0f,   10.0f, "Outer Planets: Jupiter",           "The largest planet in our solar system, a massive gas giant with famous banding and numerous moons.", "Jupiter",    1.0f },
-            { DemoStage::JUPITER_SATURN, "Saturn Rings View",         155.0f,   10.0f, "Outer Planets: Saturn & Rings",     "Featuring a spectacular, tilted ring system composed of billions of ice particles, rocky debris, and dust.", "Saturn",     1.0f },
-            { DemoStage::CREDITS,        "Final Wide View",           165.0f,   15.0f, "Solar System Explorer Credits",    "Built using C++, Modern OpenGL, GLFW, Glad, and GLM. Thank you for watching!", "",             1.0f }
+            // 1. Opening Wide (0-15s)
+            {
+                DemoStage::OPENING_WIDE, "Opening Wide", 0.0f, 15.0f,
+                "Realistic Solar System Explorer",
+                "An interactive OpenGL simulation of our celestial neighborhood, showcasing orbits, textures, lighting, and spacecraft.",
+                "Perspective Projection, Camera Transforms & Orbital Trajectories", "", 1.0f,
+                glm::vec3(12.0f, 6.0f, -12.0f), glm::vec3(15.0f, 8.0f, -15.0f), glm::vec3(-18.0f, 9.5f, 18.0f), glm::vec3(-22.0f, 11.0f, 22.0f),
+                glm::vec3(0.0f), glm::vec3(0.0f), glm::vec3(0.0f), glm::vec3(0.0f)
+            },
+            // 2. Sun Zoom (15-35s)
+            {
+                DemoStage::SUN_ZOOM, "Sun Zoom", 15.0f, 20.0f,
+                "The Sun: Central Star",
+                "The central star of our system. Animates with a procedural halo glow and serves as the primary point light source.",
+                "Procedural Texture Animation & Point Light Emission", "Sun", 1.0f,
+                glm::vec3(5.5f, 1.8f, -1.0f), glm::vec3(5.0f, 1.5f, 0.0f), glm::vec3(-2.8f, 0.5f, 2.2f), glm::vec3(-4.0f, -0.2f, 3.0f),
+                glm::vec3(0.0f), glm::vec3(0.0f), glm::vec3(0.05f, 0.0f, -0.05f), glm::vec3(0.0f)
+            },
+            // 3. Mercury View (35-41s)
+            {
+                DemoStage::INNER_PLANETS, "Mercury Fly-By", 35.0f, 6.0f,
+                "Mercury: Scorched World",
+                "The smallest and closest planet to the Sun, orbiting at high speed in a scorched, cratered environment.",
+                "Keplerian Orbital Dynamics & Dynamic Translation", "Mercury", 2.5f,
+                glm::vec3(0.38f, 0.14f, -0.15f), glm::vec3(0.34f, 0.12f, 0.0f), glm::vec3(-0.22f, 0.06f, 0.16f), glm::vec3(-0.28f, -0.02f, 0.22f),
+                glm::vec3(0.0f), glm::vec3(0.0f), glm::vec3(0.0f), glm::vec3(0.0f)
+            },
+            // 4. Venus View (41-47s)
+            {
+                DemoStage::INNER_PLANETS, "Venus Fly-By", 41.0f, 6.0f,
+                "Venus: Greenhouse Hell",
+                "Earth's sister planet, shrouded in a dense, highly reflective carbon dioxide atmosphere with extreme surface heat.",
+                "Diffuse Texture Mapping & Ambient/Specular Phong Shading", "Venus", 2.2f,
+                glm::vec3(0.52f, 0.18f, -0.25f), glm::vec3(0.45f, 0.15f, 0.0f), glm::vec3(-0.32f, 0.08f, 0.25f), glm::vec3(-0.40f, -0.04f, 0.32f),
+                glm::vec3(0.0f), glm::vec3(0.0f), glm::vec3(0.0f), glm::vec3(0.0f)
+            },
+            // 5. Earth View (47-53s)
+            {
+                DemoStage::INNER_PLANETS, "Earth Fly-By", 47.0f, 6.0f,
+                "Earth: Blue Oasis",
+                "Our home planet. The only known world in the universe hosting liquid surface water, an active biosphere, and human life.",
+                "Multi-texturing, Atmosphere Scattering Glow & Alpha Blended Clouds", "Earth", 2.0f,
+                glm::vec3(0.65f, 0.28f, -0.35f), glm::vec3(0.55f, 0.22f, 0.0f), glm::vec3(-0.35f, 0.10f, 0.28f), glm::vec3(-0.42f, -0.02f, 0.35f),
+                glm::vec3(0.0f), glm::vec3(0.0f), glm::vec3(0.0f), glm::vec3(0.0f)
+            },
+            // 6. Mars View (53-60s)
+            {
+                DemoStage::INNER_PLANETS, "Mars Fly-By", 53.0f, 7.0f,
+                "Mars: The Red Planet",
+                "Featuring iron-rich rusty soil, thin atmosphere, polar carbon dioxide ice caps, and ancient volcanic valleys.",
+                "Realistic Scale Factors & Specular Mapping", "Mars", 2.0f,
+                glm::vec3(0.50f, 0.18f, -0.22f), glm::vec3(0.42f, 0.14f, 0.0f), glm::vec3(-0.30f, 0.06f, 0.22f), glm::vec3(-0.38f, -0.04f, 0.28f),
+                glm::vec3(0.0f), glm::vec3(0.0f), glm::vec3(0.0f), glm::vec3(0.0f)
+            },
+            // 7. Earth & Moon (60-80s)
+            {
+                DemoStage::EARTH_MOON, "Earth & Moon System", 60.0f, 20.0f,
+                "Earth & Moon System",
+                "Observing the Earth and its tidally locked natural satellite, illustrating scaling and relative orbital orbits.",
+                "Relative Transformations & Dynamic Night Lights", "Earth", 1.0f,
+                glm::vec3(1.4f, 0.5f, -1.2f), glm::vec3(1.1f, 0.35f, -0.7f), glm::vec3(-0.75f, 0.20f, 0.85f), glm::vec3(-1.0f, 0.10f, 1.3f),
+                glm::vec3(0.0f), glm::vec3(0.0f), glm::vec3(0.0f), glm::vec3(0.0f)
+            },
+            // 8. Space Station Orbit (80-100s)
+            {
+                DemoStage::SPACE_STATION, "ISS Close Fly-By", 80.0f, 20.0f,
+                "International Space Station",
+                "A modular research laboratory in low Earth orbit, assembled using hierarchical truss lines and solar panels.",
+                "Hierarchical Model Assemblies & Local Euler Rotations", "SpaceStation", 2.2f,
+                glm::vec3(0.12f, 0.04f, 0.15f), glm::vec3(0.08f, 0.02f, 0.08f), glm::vec3(-0.06f, -0.015f, -0.04f), glm::vec3(-0.10f, -0.03f, -0.08f),
+                glm::vec3(0.0f, -0.005f, 0.01f), glm::vec3(0.008f, -0.005f, 0.012f), glm::vec3(0.0f, -0.005f, 0.01f), glm::vec3(0.0f, -0.005f, 0.01f)
+            },
+            // 9. Spacecraft Mission (100-125s)
+            {
+                DemoStage::SPACECRAFT, "Spacecraft Mission", 100.0f, 25.0f,
+                "Interplanetary Spacecraft",
+                "An explorer spacecraft performing a Hohmann-inspired transfer trajectory from Earth to Mars with glowing exhaust.",
+                "Tangent-based Trajectory Tracking & Follow Camera Math", "Spacecraft", 1.5f,
+                glm::vec3(-0.05f, 0.03f, -0.12f), glm::vec3(-0.04f, 0.02f, -0.08f), glm::vec3(0.06f, 0.015f, 0.03f), glm::vec3(0.09f, 0.01f, 0.06f),
+                glm::vec3(0.0f), glm::vec3(0.0f), glm::vec3(0.0f, 0.0f, 0.05f), glm::vec3(0.0f, 0.0f, 0.10f)
+            },
+            // 10. Asteroid Belt (125-145s)
+            {
+                DemoStage::ASTEROID_BELT, "Asteroid Belt Navigation", 125.0f, 20.0f,
+                "The Asteroid Belt",
+                "Navigating through the annular debris belt situated between the orbits of Mars and Jupiter.",
+                "Dynamic Instanced Particle Simulation & GL_POINTS", "AsteroidBelt", 1.2f,
+                glm::vec3(6.5f, 1.2f, -1.0f), glm::vec3(6.0f, 0.4f, 0.0f), glm::vec3(-5.8f, -0.2f, 2.5f), glm::vec3(-7.0f, -0.6f, 3.5f),
+                glm::vec3(6.0f, 0.4f, 1.0f), glm::vec3(5.0f, 0.3f, 1.5f), glm::vec3(-6.5f, -0.3f, 4.0f), glm::vec3(-8.0f, -0.7f, 5.0f)
+            },
+            // 11. Jupiter View (145-155s)
+            {
+                DemoStage::JUPITER_SATURN, "Jupiter Fly-By", 145.0f, 10.0f,
+                "Jupiter: The Gas Giant",
+                "The largest planet in the solar system, a massive gas giant with prominent atmospheric bands and multiple moons.",
+                "Scale-Proportional Texture Coordinates & Orbit Tracing", "Jupiter", 1.0f,
+                glm::vec3(1.6f, 0.6f, -1.0f), glm::vec3(1.4f, 0.4f, 0.0f), glm::vec3(-1.0f, 0.2f, 1.0f), glm::vec3(-1.2f, 0.1f, 1.4f),
+                glm::vec3(0.0f), glm::vec3(0.0f), glm::vec3(0.0f), glm::vec3(0.0f)
+            },
+            // 12. Saturn Rings View (155-165s)
+            {
+                DemoStage::JUPITER_SATURN, "Saturn Fly-By", 155.0f, 10.0f,
+                "Saturn: Ring World",
+                "Sweeping down close to Saturn's spectacular rings, composed of billions of water ice particles and dust.",
+                "Custom Ring Mesh Geometry & Double-Sided Alpha Blending", "Saturn", 1.0f,
+                glm::vec3(1.8f, 0.8f, -0.8f), glm::vec3(1.5f, 0.6f, 0.0f), glm::vec3(-1.1f, -0.05f, 1.0f), glm::vec3(-1.4f, -0.3f, 1.3f),
+                glm::vec3(0.0f), glm::vec3(0.0f), glm::vec3(0.0f), glm::vec3(0.0f)
+            },
+            // 13. Credits/Final Wide (165-180s)
+            {
+                DemoStage::CREDITS, "Solar System Credits", 165.0f, 15.0f,
+                "Solar System Simulation",
+                "Built using C++, Modern OpenGL, GLFW, Glad, and GLM. Thank you for watching!",
+                "Post-Processing Framebuffers, HDR Tone Mapping & Bloom", "", 1.0f,
+                glm::vec3(0.0f, 6.0f, 16.0f), glm::vec3(0.0f, 7.5f, 18.0f), glm::vec3(0.0f, 18.0f, 32.0f), glm::vec3(0.0f, 22.0f, 38.0f),
+                glm::vec3(0.0f), glm::vec3(0.0f), glm::vec3(0.0f), glm::vec3(0.0f)
+            }
         };
 
+
         auto getSubStageIdealState = [&](int idx, float t, glm::vec3& pos, glm::vec3& lookAt) {
-            switch (idx) {
-                case 0: { // Wide shot (0-15s)
-                    pos = glm::vec3(std::cos(t * 0.12f) * 18.0f, 7.5f + std::sin(t * 0.08f) * 2.5f, std::sin(t * 0.12f) * 18.0f);
-                    lookAt = glm::vec3(0.0f, 0.0f, 0.0f);
-                    break;
-                }
-                case 1: { // Sun close-up (15-35s)
-                    pos = glm::vec3(std::cos(t * 0.3f) * 3.2f, 0.8f, std::sin(t * 0.3f) * 3.2f);
-                    lookAt = glm::vec3(0.0f, 0.0f, 0.0f);
-                    break;
-                }
-                case 2: { // Mercury View (35-41s)
-                    glm::vec3 mercuryPos = mercury ? mercury->getPosition() : glm::vec3(0.0f);
-                    pos = mercuryPos + glm::vec3(std::cos(t * 1.2f) * 0.28f, 0.10f, std::sin(t * 1.2f) * 0.28f);
-                    lookAt = mercuryPos;
-                    break;
-                }
-                case 3: { // Venus View (41-47s)
-                    glm::vec3 venusPos = venus ? venus->getPosition() : glm::vec3(0.0f);
-                    pos = venusPos + glm::vec3(std::cos(t * 1.0f) * 0.42f, 0.15f, std::sin(t * 1.0f) * 0.42f);
-                    lookAt = venusPos;
-                    break;
-                }
-                case 4: { // Earth View (47-53s)
-                    glm::vec3 earthPos = earth ? earth->getPosition() : glm::vec3(0.0f);
-                    pos = earthPos + glm::vec3(std::cos(t * 0.8f) * 0.50f, 0.20f, std::sin(t * 0.8f) * 0.50f);
-                    lookAt = earthPos;
-                    break;
-                }
-                case 5: { // Mars View (53-60s)
-                    glm::vec3 marsPos = mars ? mars->getPosition() : glm::vec3(0.0f);
-                    pos = marsPos + glm::vec3(std::cos(t * 0.9f) * 0.38f, 0.15f, std::sin(t * 0.9f) * 0.38f);
-                    lookAt = marsPos;
-                    break;
-                }
-                case 6: { // Earth Atmosphere & Clouds (60-80s)
-                    glm::vec3 earthPos = earth ? earth->getPosition() : glm::vec3(0.0f);
-                    pos = earthPos + glm::vec3(std::cos(t * 0.5f) * 0.75f, 0.22f, std::sin(t * 0.5f) * 0.75f);
-                    lookAt = earthPos;
-                    break;
-                }
-                case 7: { // Space Station Orbit (80-100s)
-                    glm::vec3 stationPos = spaceStation ? spaceStation->getPosition() : glm::vec3(0.0f);
-                    pos = stationPos + glm::vec3(std::cos(t * 1.5f) * 0.08f, 0.025f, std::sin(t * 1.5f) * 0.08f);
-                    lookAt = stationPos;
-                    break;
-                }
-                case 8: { // Spacecraft Mission (100-125s)
-                    glm::vec3 craftPos = spacecraft ? spacecraft->getPosition() : glm::vec3(0.0f);
-                    glm::vec3 craftFwd = spacecraft ? spacecraft->getForwardDir() : glm::vec3(0.0f, 0.0f, -1.0f);
-                    pos = craftPos + glm::vec3(std::cos(t * 0.6f) * 0.12f, 0.04f, std::sin(t * 0.6f) * 0.12f);
-                    lookAt = craftPos + craftFwd * 0.01f;
-                    break;
-                }
-                case 9: { // Asteroid Belt (125-145s)
-                    pos = glm::vec3(std::cos(t * 0.08f) * 6.0f, 0.25f, std::sin(t * 0.08f) * 6.0f);
-                    lookAt = glm::vec3(std::cos(t * 0.08f + 0.2f) * 6.0f, 0.0f, std::sin(t * 0.08f + 0.2f) * 6.0f);
-                    break;
-                }
-                case 10: { // Jupiter View (145-155s)
-                    glm::vec3 jupiterPos = jupiter ? jupiter->getPosition() : glm::vec3(0.0f);
-                    pos = jupiterPos + glm::vec3(std::cos(t * 0.4f) * 1.3f, 0.4f, std::sin(t * 0.4f) * 1.3f);
-                    lookAt = jupiterPos;
-                    break;
-                }
-                case 11: { // Saturn Rings View (155-165s)
-                    glm::vec3 saturnPos = saturn ? saturn->getPosition() : glm::vec3(0.0f);
-                    pos = saturnPos + glm::vec3(std::cos(t * 0.35f) * 1.4f, 0.55f, std::sin(t * 0.35f) * 1.4f);
-                    lookAt = saturnPos;
-                    break;
-                }
-                case 12: { // Credits/Final Wide (165-180s)
-                    pos = glm::vec3(std::cos(t * 0.08f) * 22.0f, 10.0f, std::sin(t * 0.08f) * 22.0f);
-                    lookAt = glm::vec3(0.0f, 0.0f, 0.0f);
-                    break;
-                }
-                default: {
-                    pos = glm::vec3(0.0f, 10.0f, 15.0f);
-                    lookAt = glm::vec3(0.0f);
-                    break;
-                }
+            if (idx < 0 || idx >= static_cast<int>(subStages.size())) {
+                pos = glm::vec3(0.0f, 10.0f, 15.0f);
+                lookAt = glm::vec3(0.0f);
+                return;
+            }
+
+            const auto& sub = subStages[idx];
+            float stageTime = t - sub.startTime;
+            float u = stageTime / sub.duration;
+            u = glm::clamp(u, 0.0f, 1.0f);
+
+            // Interpolate relative camera position and look-at using Catmull-Rom
+            glm::vec3 relPos = CameraHelpers::interpolateCatmullRom(sub.pos0, sub.pos1, sub.pos2, sub.pos3, u);
+            glm::vec3 relLook = CameraHelpers::interpolateCatmullRom(sub.look0, sub.look1, sub.look2, sub.look3, u);
+
+            // Determine focused body position and orientation
+            glm::vec3 focusPos(0.0f);
+            bool useLocalFrame = false;
+            glm::vec3 localRight(1.0f, 0.0f, 0.0f);
+            glm::vec3 localUp(0.0f, 1.0f, 0.0f);
+            glm::vec3 localFwd(0.0f, 0.0f, -1.0f);
+
+            if (sub.highlight == "Sun") {
+                focusPos = sun ? sun->getPosition() : glm::vec3(0.0f);
+            } else if (sub.highlight == "Mercury") {
+                focusPos = mercury ? mercury->getPosition() : glm::vec3(0.0f);
+            } else if (sub.highlight == "Venus") {
+                focusPos = venus ? venus->getPosition() : glm::vec3(0.0f);
+            } else if (sub.highlight == "Earth") {
+                focusPos = earth ? earth->getPosition() : glm::vec3(0.0f);
+            } else if (sub.highlight == "Mars") {
+                focusPos = mars ? mars->getPosition() : glm::vec3(0.0f);
+            } else if (sub.highlight == "Jupiter") {
+                focusPos = jupiter ? jupiter->getPosition() : glm::vec3(0.0f);
+            } else if (sub.highlight == "Saturn") {
+                focusPos = saturn ? saturn->getPosition() : glm::vec3(0.0f);
+            } else if (sub.highlight == "SpaceStation" && spaceStation) {
+                focusPos = spaceStation->getPosition();
+                glm::mat4 model = spaceStation->getTransform().getModelMatrix();
+                localRight = glm::normalize(glm::vec3(model[0]));
+                localUp = glm::normalize(glm::vec3(model[1]));
+                localFwd = glm::normalize(glm::vec3(model[2]));
+                useLocalFrame = true;
+            } else if (sub.highlight == "Spacecraft" && spacecraft) {
+                focusPos = spacecraft->getPosition();
+                localFwd = spacecraft->getForwardDir();
+                glm::vec3 worldUp = glm::vec3(0.0f, 1.0f, 0.0f);
+                localRight = glm::normalize(glm::cross(localFwd, worldUp));
+                localUp = glm::normalize(glm::cross(localRight, localFwd));
+                useLocalFrame = true;
+            } else if (sub.highlight == "AsteroidBelt") {
+                focusPos = glm::vec3(0.0f); // centered around origin
+            }
+
+            if (useLocalFrame) {
+                pos = focusPos + relPos.x * localRight + relPos.y * localUp + relPos.z * localFwd;
+                lookAt = focusPos + relLook.x * localRight + relLook.y * localUp + relLook.z * localFwd;
+            } else {
+                pos = focusPos + relPos;
+                lookAt = focusPos + relLook;
             }
         };
 
@@ -360,32 +468,13 @@ int main() {
                 window.setCursorMode(GLFW_CURSOR_NORMAL);
             }
         };
-
-        auto renderCinematicOverlay = [&](const std::string& title, const std::string& explanation, const std::string& highlight, float alpha) {
-            if (alpha <= 0.0f) return;
-            
-            int w_width = window.getWidth();
-            int w_height = window.getHeight();
-            
-            glm::vec4 titleColor = glm::vec4(1.0f, 0.85f, 0.3f, alpha);
-            glm::vec4 expColor = glm::vec4(0.9f, 0.9f, 0.9f, alpha);
-            glm::vec4 highlightColor = glm::vec4(0.2f, 1.0f, 0.6f, alpha);
-
-            // Title: Centered near the top
-            float titleScale = 1.8f;
-            float titleWidth = title.length() * 8.0f * titleScale;
-            float titleX = (static_cast<float>(w_width) - titleWidth) / 2.0f;
-            float titleY = w_height - 70.0f;
-            textRenderer.renderText(title, titleX, titleY, titleScale, titleColor, w_width, w_height);
-
-            // Wrap explanation text
+        auto renderCenteredText = [&](const std::string& text, float centerY, float scale, const glm::vec4& color, int maxChars) {
             std::vector<std::string> lines;
             std::string currentLine = "";
-            int maxCharsPerLine = 60;
+            std::stringstream ss(text);
             std::string word;
-            std::stringstream ss(explanation);
             while (ss >> word) {
-                if (currentLine.length() + word.length() + 1 > static_cast<size_t>(maxCharsPerLine)) {
+                if (currentLine.length() + word.length() + 1 > static_cast<size_t>(maxChars)) {
                     lines.push_back(currentLine);
                     currentLine = word;
                 } else {
@@ -397,23 +486,22 @@ int main() {
                 lines.push_back(currentLine);
             }
 
-            float expScale = 1.15f;
-            float startY = w_height - 105.0f;
-            for (size_t i = 0; i < lines.size(); ++i) {
-                float lineWidth = lines[i].length() * 8.0f * expScale;
-                float lineX = (static_cast<float>(w_width) - lineWidth) / 2.0f;
-                float lineY = startY - i * 20.0f;
-                textRenderer.renderText(lines[i], lineX, lineY, expScale, expColor, w_width, w_height);
-            }
+            float lineSpacing = 18.0f * scale;
+            float totalHeight = lines.size() * lineSpacing;
+            float startY = centerY + (totalHeight / 2.0f) - (lineSpacing / 2.0f);
+            
+            int screenW = window.getWidth();
+            int screenH = window.getHeight();
 
-            // Highlight target object name
-            if (!highlight.empty()) {
-                std::string hlText = "TARGET: " + highlight;
-                float hlScale = 1.25f;
-                float hlWidth = hlText.length() * 8.0f * hlScale;
-                float hlX = (static_cast<float>(w_width) - hlWidth) / 2.0f;
-                float hlY = startY - lines.size() * 20.0f - 22.0f;
-                textRenderer.renderText(hlText, hlX, hlY, hlScale, highlightColor, w_width, w_height);
+            for (size_t i = 0; i < lines.size(); ++i) {
+                float lineWidth = lines[i].length() * 8.0f * scale;
+                float lineX = (static_cast<float>(screenW) - lineWidth) / 2.0f;
+                float lineY = startY - i * lineSpacing;
+                
+                // Shadow
+                textRenderer.renderText(lines[i], lineX + 1.0f, lineY - 1.0f, scale, glm::vec4(0.0f, 0.0f, 0.0f, color.a * 0.8f), screenW, screenH);
+                // Main text
+                textRenderer.renderText(lines[i], lineX, lineY, scale, color, screenW, screenH);
             }
         };
 
@@ -529,6 +617,22 @@ int main() {
                 spaceWasPressed = spaceIsPressed;
             }
 
+            // G key to toggle cinematic bloom
+            bool gIsPressed = (glfwGetKey(glWin, GLFW_KEY_G) == GLFW_PRESS);
+            if (gIsPressed && !gWasPressed) {
+                bloomEnabled = !bloomEnabled;
+                std::cout << "Cinematic Bloom " << (bloomEnabled ? "ENABLED" : "DISABLED") << std::endl;
+            }
+            gWasPressed = gIsPressed;
+
+            // L key to toggle letterbox
+            bool lIsPressed = (glfwGetKey(glWin, GLFW_KEY_L) == GLFW_PRESS);
+            if (lIsPressed && !lWasPressed) {
+                letterboxActive = !letterboxActive;
+            }
+            lWasPressed = lIsPressed;
+
+
             // Demo mode F1 key detection
             bool f1IsPressed = (glfwGetKey(glWin, GLFW_KEY_F1) == GLFW_PRESS);
             if (f1IsPressed && !f1WasPressed) {
@@ -590,8 +694,8 @@ int main() {
                 animationSpeed = subStages[currentSubStageIdx].speed;
             }
 
-            // Clear screen
-            renderer.clear(glm::vec4(0.04f, 0.04f, 0.06f, 1.0f));
+            // Clear screen & bind HDR Framebuffer
+            renderer.beginFrame();
 
             // Update active camera
             if (sceneManager.getActiveCamera()) {
@@ -648,225 +752,396 @@ int main() {
             // Render scene
             sceneManager.render(renderer);
 
+            // End FBO rendering and apply post-processing
+            renderer.endFrame(bloomEnabled);
+
             // Render text overlays (instructions in corners)
             int width = window.getWidth();
             int height = window.getHeight();
-            
-            // TOP-LEFT block — Solar System title:
-            textRenderer.renderText("SOLAR SYSTEM SIMULATION", 15.0f, height - 25.0f, 2.0f, glm::vec3(1.0f, 0.85f, 0.3f), width, height);
-            textRenderer.renderText("OpenGL | Computer Graphics", 15.0f, height - 50.0f, 1.2f, glm::vec3(0.8f, 0.8f, 0.8f), width, height);
+            // Setup common styles/colors
+            glm::vec4 manualBorderCol(0.15f, 0.30f, 0.55f, 0.40f);
+            glm::vec4 manualBgCol(0.06f, 0.08f, 0.12f, 0.75f);
 
-            // Mission telemetry HUD (Only in manual mode, or when Spacecraft highlight is active)
-            bool showSpacecraftTelemetry = (currentDemo == DemoStage::NONE) || 
-                (currentDemo != DemoStage::NONE && subStages[currentSubStageIdx].highlight == "Spacecraft");
-            if (spacecraft && showSpacecraftTelemetry) {
-                float progress = spacecraft->getProgress();
-                char progressPercentStr[32];
-                std::snprintf(progressPercentStr, sizeof(progressPercentStr), "%.1f%%", progress * 100.0f);
+            // 1. --- FLOATING PLANET NAME LABELS (Manual mode only) ---
+            if (currentDemo == DemoStage::NONE && sceneManager.getActiveCamera()) {
+                float aspect = static_cast<float>(width) / static_cast<float>(height);
+                glm::mat4 view = sceneManager.getActiveCamera()->getViewMatrix();
+                glm::mat4 projection = sceneManager.getActiveCamera()->getProjectionMatrix(aspect);
+                glm::vec3 camPos = sceneManager.getActiveCamera()->getPosition();
                 
-                int barWidth = 12;
-                int filled = static_cast<int>(progress * barWidth);
-                std::string bar = " [";
-                for (int i = 0; i < barWidth; ++i) {
-                    if (i < filled) bar += "=";
-                    else if (i == filled) bar += ">";
-                    else bar += ".";
+                struct LabelTarget {
+                    std::string name;
+                    glm::vec3 pos;
+                    float radius;
+                    glm::vec3 color;
+                };
+                std::vector<LabelTarget> labelTargets;
+                labelTargets.push_back({ "SUN", sun->getPosition(), sun->getTransform().getScale().x, glm::vec3(1.0f, 0.75f, 0.2f) });
+                for (const auto& p : planets) {
+                    std::string nameUpper = p->getName();
+                    std::transform(nameUpper.begin(), nameUpper.end(), nameUpper.begin(), ::toupper);
+                    labelTargets.push_back({ nameUpper, p->getPosition(), p->getRadius(), glm::vec3(0.8f, 0.9f, 1.0f) });
                 }
-                bar += "]";
-
-                textRenderer.renderText("Mission: Earth to Mars", 15.0f, height - 85.0f, 1.2f, glm::vec3(0.0f, 0.9f, 1.0f), width, height);
-                textRenderer.renderText("Current target: Mars", 15.0f, height - 105.0f, 1.2f, glm::vec3(0.0f, 0.9f, 1.0f), width, height);
-                textRenderer.renderText(std::string("Progress: ") + progressPercentStr + bar, 15.0f, height - 125.0f, 1.2f, glm::vec3(0.0f, 0.9f, 1.0f), width, height);
+                if (spacecraft) {
+                    labelTargets.push_back({ "SPACECRAFT", spacecraft->getPosition(), 0.05f, glm::vec3(0.0f, 1.0f, 0.8f) });
+                }
+                if (spaceStation) {
+                    labelTargets.push_back({ "SPACE STATION", spaceStation->getPosition(), 0.05f, glm::vec3(0.0f, 1.0f, 0.8f) });
+                }
+                
+                for (const auto& target : labelTargets) {
+                    float dist = glm::distance(camPos, target.pos);
+                    
+                    // Fade out labels if camera gets too close to prevent overlapping
+                    float minFadeDist = target.radius * 2.0f;
+                    float maxFadeDist = target.radius * 4.0f;
+                    float labelAlpha = 1.0f;
+                    if (dist < minFadeDist) {
+                        labelAlpha = 0.0f;
+                    } else if (dist < maxFadeDist) {
+                        labelAlpha = (dist - minFadeDist) / (maxFadeDist - minFadeDist);
+                    }
+                    
+                    if (labelAlpha > 0.0f) {
+                        glm::vec2 screenPos;
+                        if (projectWorldToScreen(target.pos, view, projection, width, height, screenPos)) {
+                            float labelScale = 0.9f * UI_SCALE;
+                            float textW = target.name.length() * 8.0f * labelScale;
+                            float labelX = screenPos.x - (textW / 2.0f);
+                            float labelY = screenPos.y + 12.0f * UI_SCALE;
+                            
+                            textRenderer.renderText(target.name, labelX, labelY, labelScale, glm::vec4(target.color, labelAlpha * 0.85f), width, height);
+                        }
+                    }
+                }
             }
 
-            // Cinematic Overlay for Demo Mode
+            // 2. --- CINEMATIC DEMO MODE OVERLAY (F1 Demo only) ---
             if (currentDemo != DemoStage::NONE) {
                 float stageTime = demoTimer - subStages[currentSubStageIdx].startTime;
                 float duration = subStages[currentSubStageIdx].duration;
-                float alpha = 1.0f;
+                
+                // A. Render Letterbox Black Bars (on top of 3D, behind HUD text)
+                float barHeight = height * 0.12f;
+                if (letterboxActive) {
+                    // Bottom bar
+                    textRenderer.renderQuad(0.0f, 0.0f, static_cast<float>(width), barHeight, glm::vec4(0.0f, 0.0f, 0.0f, 1.0f), width, height);
+                    // Top bar
+                    textRenderer.renderQuad(0.0f, static_cast<float>(height) - barHeight, static_cast<float>(width), barHeight, glm::vec4(0.0f, 0.0f, 0.0f, 1.0f), width, height);
+                }
+
+                // B. Fade-in/fade-out logic for the HUD overlay (1.5s fade at ends)
+                float hudAlpha = 1.0f;
                 if (stageTime < 1.5f) {
-                    alpha = stageTime / 1.5f;
+                    hudAlpha = stageTime / 1.5f;
                 } else if (stageTime > duration - 1.5f) {
-                    alpha = (duration - stageTime) / 1.5f;
+                    hudAlpha = (duration - stageTime) / 1.5f;
                 }
-                alpha = glm::clamp(alpha, 0.0f, 1.0f);
+                hudAlpha = glm::clamp(hudAlpha, 0.0f, 1.0f);
 
-                renderCinematicOverlay(subStages[currentSubStageIdx].title, subStages[currentSubStageIdx].explanation, subStages[currentSubStageIdx].highlight, alpha);
+                // C. Floating panel for bottom HUD if letterbox is not active (to ensure readability)
+                if (hudAlpha > 0.0f) {
+                    if (!letterboxActive) {
+                        float panelW = width * 0.75f;
+                        float panelH = barHeight * 0.9f;
+                        float panelX = (width - panelW) / 2.0f;
+                        float panelY = 10.0f;
+                        glm::vec4 panelBg = glm::vec4(0.06f, 0.08f, 0.12f, 0.75f * hudAlpha);
+                        glm::vec4 panelBorder = glm::vec4(0.2f, 1.0f, 0.6f, 0.3f * hudAlpha);
+                        textRenderer.renderQuad(panelX - 1.0f, panelY - 1.0f, panelW + 2.0f, panelH + 2.0f, panelBorder, width, height);
+                        textRenderer.renderQuad(panelX, panelY, panelW, panelH, panelBg, width, height);
+                    }
+
+                    // D. Draw bottom HUD text
+                    const auto& sub = subStages[currentSubStageIdx];
+                    
+                    // Center heights relative to bottom area
+                    float bottomCenterY = letterboxActive ? (barHeight * 0.5f) : (10.0f + (barHeight * 0.9f) * 0.5f);
+                    
+                    float titleY = bottomCenterY + 22.0f * UI_SCALE;
+                    float expY = bottomCenterY;
+                    float conceptY = bottomCenterY - 20.0f * UI_SCALE;
+
+                    // 1. Scene Title
+                    glm::vec4 titleCol = glm::vec4(1.0f, 0.85f, 0.3f, hudAlpha);
+                    std::string sceneTitleStr = sub.name;
+                    std::transform(sceneTitleStr.begin(), sceneTitleStr.end(), sceneTitleStr.begin(), ::toupper);
+                    float titleScale = 1.3f * UI_SCALE;
+                    float titleW = sceneTitleStr.length() * 8.0f * titleScale;
+                    float titleX = (width - titleW) / 2.0f;
+                    textRenderer.renderText(sceneTitleStr, titleX + 1.0f, titleY - 1.0f, titleScale, glm::vec4(0.0f, 0.0f, 0.0f, hudAlpha * 0.8f), width, height);
+                    textRenderer.renderText(sceneTitleStr, titleX, titleY, titleScale, titleCol, width, height);
+
+                    // 2. Explanation (Wrapped)
+                    glm::vec4 expCol = glm::vec4(0.9f, 0.9f, 0.9f, hudAlpha);
+                    int maxChars = letterboxActive ? (width - 60) / (8.0f * UI_SCALE) : (width * 0.7f) / (8.0f * UI_SCALE);
+                    renderCenteredText(sub.explanation, expY, 1.0f * UI_SCALE, expCol, maxChars);
+
+                    // 3. CG Concept Demonstrated
+                    glm::vec4 conceptCol = glm::vec4(0.2f, 1.0f, 0.6f, hudAlpha);
+                    std::string conceptStr = "CG CONCEPT: " + sub.concept;
+                    float conceptScale = 0.85f * UI_SCALE;
+                    float conceptW = conceptStr.length() * 8.0f * conceptScale;
+                    float conceptX = (width - conceptW) / 2.0f;
+                    textRenderer.renderText(conceptStr, conceptX + 1.0f, conceptY - 1.0f, conceptScale, glm::vec4(0.0f, 0.0f, 0.0f, hudAlpha * 0.8f), width, height);
+                    textRenderer.renderText(conceptStr, conceptX, conceptY, conceptScale, conceptCol, width, height);
+                }
+
+                // E. Render Large Cinematic Center Titles (First 4s of each stage)
+                float titleAlpha = 0.0f;
+                float titleDisplayDuration = 4.0f;
+                if (stageTime < titleDisplayDuration) {
+                    if (stageTime < 1.0f) {
+                        titleAlpha = stageTime / 1.0f;
+                    } else if (stageTime > titleDisplayDuration - 1.0f) {
+                        titleAlpha = (titleDisplayDuration - stageTime) / 1.0f;
+                    } else {
+                        titleAlpha = 1.0f;
+                    }
+                }
+                titleAlpha = glm::clamp(titleAlpha, 0.0f, 1.0f);
+
+                if (titleAlpha > 0.0f) {
+                    std::string largeTitleStr = subStages[currentSubStageIdx].title;
+                    std::transform(largeTitleStr.begin(), largeTitleStr.end(), largeTitleStr.begin(), ::toupper);
+                    float scale = 2.4f * UI_SCALE;
+                    float textW = largeTitleStr.length() * 8.0f * scale;
+                    float textX = (width - textW) / 2.0f;
+                    float textY = height * 0.55f;
+                    
+                    // Shadow
+                    textRenderer.renderText(largeTitleStr, textX + 2.0f, textY - 2.0f, scale, glm::vec4(0.0f, 0.0f, 0.0f, titleAlpha * 0.8f), width, height);
+                    // Foreground
+                    textRenderer.renderText(largeTitleStr, textX, textY, scale, glm::vec4(1.0f, 0.9f, 0.5f, titleAlpha), width, height);
+                }
+
+                // F. Render Top-Right Demo Controls Reminder
+                std::string reminderStr = "[SPACE] Pause  [F1] Restart  [ESC] Exit  [L] Letterbox: " + std::string(letterboxActive ? "ON" : "OFF");
+                float remScale = 0.85f * UI_SCALE;
+                float remW = reminderStr.length() * 8.0f * remScale;
+                float remX = width - remW - 20.0f;
+                float remY = height - (letterboxActive ? (barHeight * 0.5f) : 25.0f);
+                // Shadow
+                textRenderer.renderText(reminderStr, remX + 1.0f, remY - 1.0f, remScale, glm::vec4(0.0f, 0.0f, 0.0f, 0.7f), width, height);
+                // Foreground
+                textRenderer.renderText(reminderStr, remX, remY, remScale, glm::vec4(0.7f, 0.85f, 1.0f, 0.8f), width, height);
             }
 
-            // BOTTOM-LEFT block — Controls:
+
+            // 3. --- TOP-LEFT PANEL (Simulation info, Manual mode only) ---
             if (currentDemo == DemoStage::NONE) {
-                textRenderer.renderText("[1-5] Cameras  [N/B] Next/Prev Planet  [ENTER] Focus", 15.0f, 75.0f, 1.1f, glm::vec3(1.0f, 1.0f, 1.0f), width, height);
-                textRenderer.renderText("[SPACE] Pause  [+/-] Speed  [F1] Demo Mode", 15.0f, 50.0f, 1.1f, glm::vec3(1.0f, 1.0f, 1.0f), width, height);
-                textRenderer.renderText("[ESC] Exit", 15.0f, 25.0f, 1.1f, glm::vec3(0.5f, 0.5f, 0.5f), width, height);
-            } else {
-                textRenderer.renderText("[SPACE] Pause/Resume Demo", 15.0f, 55.0f, 1.1f, glm::vec3(1.0f, 1.0f, 1.0f), width, height);
-                textRenderer.renderText("[F1] Restart Demo", 15.0f, 35.0f, 1.1f, glm::vec3(0.2f, 1.0f, 0.6f), width, height);
-                textRenderer.renderText("[ESC] Exit Demo", 15.0f, 15.0f, 1.1f, glm::vec3(0.5f, 0.5f, 0.5f), width, height);
-            }
-
-            // BOTTOM-CENTER — PAUSED indicator (only when paused):
-            if (animationPaused) {
-                std::string pauseText = (currentDemo == DemoStage::NONE) ? "⏸ PAUSED" : "⏸ DEMO PAUSED";
-                float pauseScale = 2.0f;
-                float offset = (pauseText.length() * 8.0f * pauseScale) / 2.0f;
-                glm::vec3 pauseColor = (currentDemo == DemoStage::NONE) ? glm::vec3(1.0f, 0.5f, 0.0f) : glm::vec3(1.0f, 0.35f, 0.0f);
-                textRenderer.renderText(pauseText, (width / 2.0f) - offset, 35.0f, pauseScale, pauseColor, width, height);
-            }
-
-            // TOP-RIGHT — Speed and camera info:
-            std::string camName = sceneManager.getActiveCamera() ? sceneManager.getActiveCamera()->getName() : "None";
-            std::string camStr = "Camera: " + camName;
-            if (currentDemo != DemoStage::NONE) {
-                camStr += " (Demo)";
-            }
-            float camScale = 1.3f;
-            float camX = width - (camStr.length() * 8.0f * camScale) - 15.0f;
-            textRenderer.renderText(camStr, camX, height - 25.0f, camScale, glm::vec3(0.0f, 1.0f, 1.0f), width, height);
-
-            std::string speedOverlayStr;
-            glm::vec3 speedColor(1.0f, 1.0f, 1.0f);
-            if (animationPaused) {
-                speedOverlayStr = "Speed: PAUSED";
-            } else {
-                char speedBufVal[32];
-                std::snprintf(speedBufVal, sizeof(speedBufVal), "%.1f", animationSpeed);
-                speedOverlayStr = "Speed: " + std::string(speedBufVal) + "x";
-                if (currentDemo != DemoStage::NONE) {
-                    speedOverlayStr += " (Demo)";
-                }
-                if (animationSpeed > 1.5f) {
-                    speedColor = glm::vec3(1.0f, 1.0f, 0.0f);
-                }
-            }
-            float speedScale = 1.3f;
-            float speedX = width - (speedOverlayStr.length() * 8.0f * speedScale) - 15.0f;
-            textRenderer.renderText(speedOverlayStr, speedX, height - 50.0f, speedScale, speedColor, width, height);
-
-            // Render label overlay if camera is near Earth (only in manual mode or specific stages)
-            if (sceneManager.getActiveCamera() && earth) {
-                glm::vec3 camPos = sceneManager.getActiveCamera()->getPosition();
-                glm::vec3 earthPos = earth->getPosition();
-                float dist = glm::distance(camPos, earthPos);
-                // In demo mode, only show if target matches SpaceStation
-                bool showStationLabel = (currentDemo == DemoStage::NONE && dist < 2.0f) || 
-                    (currentDemo != DemoStage::NONE && subStages[currentSubStageIdx].highlight == "SpaceStation");
-                if (showStationLabel) {
-                    std::string labelText = "ISS-style Space Station";
-                    float labelScale = 1.3f;
-                    float labelWidth = labelText.length() * 8.0f * labelScale;
-                    float labelX = (width - labelWidth) / 2.0f;
-                    float labelY = height - 90.0f; 
-                    textRenderer.renderText(labelText, labelX, labelY, labelScale, glm::vec3(0.0f, 0.9f, 1.0f), width, height);
+                bool showSpacecraftTelemetry = (spacecraft != nullptr);
+                float tlW = 380.0f * UI_SCALE;
+                float tlH = (showSpacecraftTelemetry ? 120.0f : 60.0f) * UI_SCALE;
+                float tlX = 15.0f;
+                float tlY = height - tlH - 15.0f;
+                
+                textRenderer.renderQuad(tlX - 1.0f, tlY - 1.0f, tlW + 2.0f, tlH + 2.0f, manualBorderCol, width, height);
+                textRenderer.renderQuad(tlX, tlY, tlW, tlH, manualBgCol, width, height);
+                
+                textRenderer.renderText("SOLAR SYSTEM SIMULATION", tlX + 15.0f * UI_SCALE, tlY + tlH - 25.0f * UI_SCALE, 1.6f * UI_SCALE, glm::vec3(1.0f, 0.85f, 0.3f), width, height);
+                textRenderer.renderText("OpenGL | Computer Graphics", tlX + 15.0f * UI_SCALE, tlY + tlH - 45.0f * UI_SCALE, 1.0f * UI_SCALE, glm::vec3(0.7f, 0.75f, 0.8f), width, height);
+                
+                if (showSpacecraftTelemetry) {
+                    // Draw separator line
+                    textRenderer.renderQuad(tlX + 15.0f * UI_SCALE, tlY + tlH - 55.0f * UI_SCALE, tlW - 30.0f * UI_SCALE, 1.0f, manualBorderCol, width, height);
+                    
+                    float progress = spacecraft->getProgress();
+                    char progressPercentStr[32];
+                    std::snprintf(progressPercentStr, sizeof(progressPercentStr), "%.1f%%", progress * 100.0f);
+                    
+                    int barWidth = 12;
+                    int filled = static_cast<int>(progress * barWidth);
+                    std::string bar = " [";
+                    for (int i = 0; i < barWidth; ++i) {
+                        if (i < filled) bar += "=";
+                        else if (i == filled) bar += ">";
+                        else bar += ".";
+                    }
+                    bar += "]";
+                    
+                    textRenderer.renderText("Mission: Earth to Mars", tlX + 15.0f * UI_SCALE, tlY + tlH - 75.0f * UI_SCALE, 1.0f * UI_SCALE, glm::vec3(0.0f, 0.9f, 1.0f), width, height);
+                    textRenderer.renderText("Current target: Mars", tlX + 15.0f * UI_SCALE, tlY + tlH - 92.0f * UI_SCALE, 1.0f * UI_SCALE, glm::vec3(0.0f, 0.9f, 1.0f), width, height);
+                    textRenderer.renderText(std::string("Progress: ") + progressPercentStr + bar, tlX + 15.0f * UI_SCALE, tlY + tlH - 109.0f * UI_SCALE, 1.0f * UI_SCALE, glm::vec3(0.0f, 0.9f, 1.0f), width, height);
                 }
             }
 
-            // --- RIGHT-SIDE INFORMATION OVERLAY HUD PANEL ---
-            bool showHudPanel = false;
-            PlanetInfo hudInfo;
-            bool isDemoFocus = false;
-
+            // 4. --- TOP-RIGHT PANEL (Camera & Speed, Manual mode only) ---
             if (currentDemo == DemoStage::NONE) {
-                // Manual mode: show selected planet details
+                std::string camName = sceneManager.getActiveCamera() ? sceneManager.getActiveCamera()->getName() : "None";
+                std::string camStr = "Camera: " + camName;
+                
+                std::string speedOverlayStr;
+                glm::vec3 speedColor(1.0f, 1.0f, 1.0f);
+                if (animationPaused) {
+                    speedOverlayStr = "Speed: PAUSED";
+                } else {
+                    char speedBufVal[32];
+                    std::snprintf(speedBufVal, sizeof(speedBufVal), "%.1f", animationSpeed);
+                    speedOverlayStr = "Speed: " + std::string(speedBufVal) + "x";
+                    if (animationSpeed > 1.5f) {
+                        speedColor = glm::vec3(1.0f, 1.0f, 0.0f);
+                    }
+                }
+                
+                float trW = 260.0f * UI_SCALE;
+                float trH = 60.0f * UI_SCALE;
+                float trX = width - trW - 15.0f;
+                float trY = height - trH - 15.0f;
+                
+                textRenderer.renderQuad(trX - 1.0f, trY - 1.0f, trW + 2.0f, trH + 2.0f, manualBorderCol, width, height);
+                textRenderer.renderQuad(trX, trY, trW, trH, manualBgCol, width, height);
+                
+                textRenderer.renderText(camStr, trX + 15.0f * UI_SCALE, trY + trH - 22.0f * UI_SCALE, 1.0f * UI_SCALE, glm::vec3(0.0f, 1.0f, 1.0f), width, height);
+                textRenderer.renderText(speedOverlayStr, trX + 15.0f * UI_SCALE, trY + trH - 42.0f * UI_SCALE, 1.0f * UI_SCALE, speedColor, width, height);
+            }
+
+            // 5. --- BOTTOM-LEFT PANEL (Controls, Manual mode only) ---
+            if (currentDemo == DemoStage::NONE) {
+                float blW = 500.0f * UI_SCALE;
+                float blH = 75.0f * UI_SCALE;
+                float blX = 15.0f;
+                float blY = 15.0f;
+                
+                textRenderer.renderQuad(blX - 1.0f, blY - 1.0f, blW + 2.0f, blH + 2.0f, manualBorderCol, width, height);
+                textRenderer.renderQuad(blX, blY, blW, blH, manualBgCol, width, height);
+                
+                textRenderer.renderText("[1-5] Cameras | [N/B] Next/Prev Planet | [ENTER] Focus", blX + 15.0f * UI_SCALE, blY + blH - 22.0f * UI_SCALE, 0.95f * UI_SCALE, glm::vec3(1.0f, 1.0f, 1.0f), width, height);
+                textRenderer.renderText("[SPACE] Pause | [+/-] Speed | [F1] Demo Mode | [G] Bloom: " + std::string(bloomEnabled ? "ON" : "OFF"), blX + 15.0f * UI_SCALE, blY + blH - 42.0f * UI_SCALE, 0.95f * UI_SCALE, glm::vec3(1.0f, 1.0f, 1.0f), width, height);
+                textRenderer.renderText("[ESC] Exit", blX + 15.0f * UI_SCALE, blY + blH - 62.0f * UI_SCALE, 0.95f * UI_SCALE, glm::vec3(0.5f, 0.5f, 0.5f), width, height);
+            }
+
+            // 6. --- RIGHT-SIDE INFORMATION OVERLAY HUD PANEL (Manual mode only) ---
+            if (currentDemo == DemoStage::NONE) {
+                bool showHudPanel = false;
+                PlanetInfo hudInfo;
                 if (selectedPlanetIdx >= 0 && selectedPlanetIdx < static_cast<int>(planets.size())) {
                     hudInfo = getPlanetInfo(planets[selectedPlanetIdx]->getName());
                     showHudPanel = true;
-                    isDemoFocus = false;
                 }
-            } else {
-                // Demo mode: show current demo highlight if not empty
-                std::string hl = subStages[currentSubStageIdx].highlight;
-                if (!hl.empty()) {
-                    hudInfo = getPlanetInfo(hl);
-                    showHudPanel = true;
-                    isDemoFocus = true;
-                }
-            }
 
-            if (showHudPanel) {
-                float panelW = 320.0f;
-                float panelH = 430.0f;
-                float panelX = width - panelW - 15.0f;
-                float panelY = height - panelH - 80.0f; // fits nicely below top-right speed/camera text
+                if (showHudPanel) {
+                    float panelW = 320.0f * UI_SCALE;
+                    float panelH = 430.0f * UI_SCALE;
+                    float panelX = width - panelW - 15.0f;
+                    float panelY = height - panelH - 90.0f * UI_SCALE; // fits nicely below top-right camera/speed text
 
-                // 1. Draw glowing 1px border (green for demo focus, cyan for manual focus)
-                glm::vec4 borderColor = isDemoFocus ? glm::vec4(0.2f, 1.0f, 0.6f, 0.4f) : glm::vec4(0.0f, 0.8f, 1.0f, 0.4f);
-                textRenderer.renderQuad(panelX - 1.0f, panelY - 1.0f, panelW + 2.0f, panelH + 2.0f, borderColor, width, height);
+                    glm::vec4 borderColor = glm::vec4(0.0f, 0.8f, 1.0f, 0.4f);
+                    textRenderer.renderQuad(panelX - 1.0f, panelY - 1.0f, panelW + 2.0f, panelH + 2.0f, borderColor, width, height);
+                    textRenderer.renderQuad(panelX, panelY, panelW, panelH, manualBgCol, width, height);
 
-                // 2. Draw dark semi-transparent background
-                glm::vec4 bgCol = glm::vec4(0.06f, 0.08f, 0.12f, 0.75f);
-                textRenderer.renderQuad(panelX, panelY, panelW, panelH, bgCol, width, height);
+                    float curY = panelY + panelH - 25.0f * UI_SCALE;
+                    textRenderer.renderText("[ SELECTED ]", panelX + 15.0f * UI_SCALE, curY, 0.9f * UI_SCALE, glm::vec3(0.0f, 0.8f, 1.0f), width, height);
+                    curY -= 20.0f * UI_SCALE;
 
-                // 3. Draw panel content
-                float curY = panelY + panelH - 25.0f;
-                
-                // Mode Tag [ SELECTED ] or [ DEMO FOCUS ]
-                if (isDemoFocus) {
-                    textRenderer.renderText("[ DEMO TARGET ]", panelX + 15.0f, curY, 0.9f, glm::vec3(0.2f, 1.0f, 0.6f), width, height);
-                } else {
-                    textRenderer.renderText("[ SELECTED ]", panelX + 15.0f, curY, 0.9f, glm::vec3(0.0f, 0.8f, 1.0f), width, height);
-                }
-                curY -= 25.0f;
+                    textRenderer.renderText(hudInfo.name, panelX + 15.0f * UI_SCALE, curY, 1.4f * UI_SCALE, glm::vec3(1.0f, 0.85f, 0.3f), width, height);
+                    curY -= 12.0f * UI_SCALE;
 
-                // Planet / Target Name
-                textRenderer.renderText(hudInfo.name, panelX + 15.0f, curY, 1.6f, glm::vec3(1.0f, 0.85f, 0.3f), width, height);
-                curY -= 15.0f;
+                    textRenderer.renderQuad(panelX + 15.0f * UI_SCALE, curY, panelW - 30.0f * UI_SCALE, 1.0f, borderColor, width, height);
+                    curY -= 18.0f * UI_SCALE;
 
-                // Separator Line
-                textRenderer.renderQuad(panelX + 15.0f, curY, panelW - 30.0f, 2.0f, borderColor, width, height);
-                curY -= 20.0f;
-
-                // Text wrapping lambda to fit values nicely inside the panel
-                auto renderWrappedText = [&](const std::string& text, float x, float y, float maxW, float scale, const glm::vec3& color) {
-                    std::vector<std::string> lines;
-                    std::string currentLine = "";
-                    std::stringstream ss(text);
-                    std::string word;
-                    float charW = 8.0f * scale;
-                    while (ss >> word) {
-                        std::string testLine = currentLine.empty() ? word : currentLine + " " + word;
-                        if (testLine.length() * charW > maxW) {
-                            lines.push_back(currentLine);
-                            currentLine = word;
-                        } else {
-                            currentLine = testLine;
+                    auto renderWrappedText = [&](const std::string& text, float x, float y, float maxW, float scale, const glm::vec3& color) {
+                        std::vector<std::string> lines;
+                        std::string currentLine = "";
+                        std::stringstream ss(text);
+                        std::string word;
+                        float charW = 8.0f * scale;
+                        while (ss >> word) {
+                            std::string testLine = currentLine.empty() ? word : currentLine + " " + word;
+                            if (testLine.length() * charW > maxW) {
+                                lines.push_back(currentLine);
+                                currentLine = word;
+                            } else {
+                                currentLine = testLine;
+                            }
                         }
-                    }
-                    if (!currentLine.empty()) {
-                        lines.push_back(currentLine);
-                    }
-                    
-                    float lineY = y;
-                    for (const auto& line : lines) {
-                        textRenderer.renderText(line, x, lineY, scale, color, width, height);
-                        lineY -= 15.0f * scale;
-                    }
-                    return y - lineY; // returns height consumed
-                };
+                        if (!currentLine.empty()) {
+                            lines.push_back(currentLine);
+                        }
+                        
+                        float lineY = y;
+                        for (const auto& line : lines) {
+                            textRenderer.renderText(line, x, lineY, scale, color, width, height);
+                            lineY -= 15.0f * scale;
+                        }
+                        return y - lineY; // returns height consumed
+                    };
 
-                // Type Section
-                textRenderer.renderText("TYPE", panelX + 15.0f, curY, 1.0f, glm::vec3(0.0f, 0.8f, 1.0f), width, height);
-                curY -= 18.0f;
-                float typeH = renderWrappedText(hudInfo.type, panelX + 15.0f, curY, panelW - 30.0f, 1.0f, glm::vec3(0.9f, 0.9f, 0.9f));
-                curY -= typeH + 12.0f;
+                    // Type Section
+                    textRenderer.renderText("TYPE", panelX + 15.0f * UI_SCALE, curY, 0.9f * UI_SCALE, glm::vec3(0.0f, 0.8f, 1.0f), width, height);
+                    curY -= 15.0f * UI_SCALE;
+                    float typeH = renderWrappedText(hudInfo.type, panelX + 15.0f * UI_SCALE, curY, panelW - 30.0f * UI_SCALE, 0.9f * UI_SCALE, glm::vec3(0.9f, 0.9f, 0.9f));
+                    curY -= typeH + 10.0f * UI_SCALE;
 
-                // Features Section
-                textRenderer.renderText("FEATURES", panelX + 15.0f, curY, 1.0f, glm::vec3(0.0f, 0.8f, 1.0f), width, height);
-                curY -= 18.0f;
-                float featH = renderWrappedText(hudInfo.features, panelX + 15.0f, curY, panelW - 30.0f, 1.0f, glm::vec3(0.9f, 0.9f, 0.9f));
-                curY -= featH + 12.0f;
+                    // Features Section
+                    textRenderer.renderText("FEATURES", panelX + 15.0f * UI_SCALE, curY, 0.9f * UI_SCALE, glm::vec3(0.0f, 0.8f, 1.0f), width, height);
+                    curY -= 15.0f * UI_SCALE;
+                    float featH = renderWrappedText(hudInfo.features, panelX + 15.0f * UI_SCALE, curY, panelW - 30.0f * UI_SCALE, 0.9f * UI_SCALE, glm::vec3(0.9f, 0.9f, 0.9f));
+                    curY -= featH + 10.0f * UI_SCALE;
 
-                // Moons Section
-                textRenderer.renderText("MOONS INCLUDED", panelX + 15.0f, curY, 1.0f, glm::vec3(0.0f, 0.8f, 1.0f), width, height);
-                curY -= 18.0f;
-                float moonH = renderWrappedText(hudInfo.moons, panelX + 15.0f, curY, panelW - 30.0f, 1.0f, glm::vec3(0.9f, 0.9f, 0.9f));
-                curY -= moonH + 12.0f;
+                    // Moons Section
+                    textRenderer.renderText("MOONS INCLUDED", panelX + 15.0f * UI_SCALE, curY, 0.9f * UI_SCALE, glm::vec3(0.0f, 0.8f, 1.0f), width, height);
+                    curY -= 15.0f * UI_SCALE;
+                    float moonH = renderWrappedText(hudInfo.moons, panelX + 15.0f * UI_SCALE, curY, panelW - 30.0f * UI_SCALE, 0.9f * UI_SCALE, glm::vec3(0.9f, 0.9f, 0.9f));
+                    curY -= moonH + 10.0f * UI_SCALE;
 
-                // Concepts Section
-                textRenderer.renderText("CG CONCEPTS DEMONSTRATED", panelX + 15.0f, curY, 1.0f, glm::vec3(0.0f, 0.8f, 1.0f), width, height);
-                curY -= 18.0f;
-                renderWrappedText(hudInfo.concepts, panelX + 15.0f, curY, panelW - 30.0f, 1.0f, glm::vec3(0.9f, 0.9f, 0.9f));
+                    // Concepts Section
+                    textRenderer.renderText("CG CONCEPTS DEMONSTRATED", panelX + 15.0f * UI_SCALE, curY, 0.9f * UI_SCALE, glm::vec3(0.0f, 0.8f, 1.0f), width, height);
+                    curY -= 15.0f * UI_SCALE;
+                    renderWrappedText(hudInfo.concepts, panelX + 15.0f * UI_SCALE, curY, panelW - 30.0f * UI_SCALE, 0.9f * UI_SCALE, glm::vec3(0.9f, 0.9f, 0.9f));
+                }
             }
+
+            // 7. --- TOP-CENTER ISS STATION PANEL (Manual mode only) ---
+            if (currentDemo == DemoStage::NONE && sceneManager.getActiveCamera() && earth) {
+                glm::vec3 camPos = sceneManager.getActiveCamera()->getPosition();
+                glm::vec3 earthPos = earth->getPosition();
+                float dist = glm::distance(camPos, earthPos);
+                if (dist < 2.0f) {
+                    std::string label1 = "ISS-style Space Station";
+                    std::string label2 = "Low Earth Orbit";
+                    std::string label3 = "Built from hierarchical transformations";
+                    
+                    float labelScale = 1.3f * UI_SCALE;
+                    float subScale = 1.0f * UI_SCALE;
+                    
+                    float sW = 320.0f * UI_SCALE;
+                    float sH = 75.0f * UI_SCALE;
+                    float sX = (width - sW) / 2.0f;
+                    float sY = height - sH - 90.0f * UI_SCALE;
+                    
+                    glm::vec4 sBorder = glm::vec4(0.0f, 0.9f, 1.0f, 0.4f);
+                    textRenderer.renderQuad(sX - 1.0f, sY - 1.0f, sW + 2.0f, sH + 2.0f, sBorder, width, height);
+                    textRenderer.renderQuad(sX, sY, sW, sH, manualBgCol, width, height);
+                    
+                    float yOffset = sY + sH - 22.0f * UI_SCALE;
+                    textRenderer.renderText(label1, sX + (sW - label1.length() * 8.0f * labelScale) / 2.0f, yOffset, labelScale, glm::vec3(0.0f, 0.9f, 1.0f), width, height);
+                    yOffset -= 20.0f * UI_SCALE;
+                    textRenderer.renderText(label2, sX + (sW - label2.length() * 8.0f * subScale) / 2.0f, yOffset, subScale, glm::vec3(0.8f, 0.8f, 0.8f), width, height);
+                    yOffset -= 17.0f * UI_SCALE;
+                    textRenderer.renderText(label3, sX + (sW - label3.length() * 8.0f * subScale) / 2.0f, yOffset, subScale, glm::vec3(1.0f, 0.85f, 0.3f), width, height);
+                }
+            }
+
+            // 8. --- CENTER PAUSE INDICATOR (When simulation or demo is paused) ---
+            if (animationPaused) {
+                std::string pauseText = (currentDemo == DemoStage::NONE) ? "PAUSED" : "DEMO PAUSED";
+                float pauseScale = 1.8f * UI_SCALE;
+                glm::vec3 pauseColor = (currentDemo == DemoStage::NONE) ? glm::vec3(1.0f, 0.5f, 0.0f) : glm::vec3(1.0f, 0.35f, 0.0f);
+                
+                float cardW = (pauseText.length() * 8.0f) * pauseScale + 40.0f * UI_SCALE;
+                float cardH = 8.0f * pauseScale + 24.0f * UI_SCALE;
+                float cardX = (width - cardW) / 2.0f;
+                float cardY = (height - cardH) / 2.0f;
+                
+                glm::vec4 pauseBorder = glm::vec4(1.0f, 0.5f, 0.0f, 0.4f);
+                glm::vec4 pauseBg = glm::vec4(0.08f, 0.05f, 0.02f, 0.85f);
+                textRenderer.renderQuad(cardX - 1.0f, cardY - 1.0f, cardW + 2.0f, cardH + 2.0f, pauseBorder, width, height);
+                textRenderer.renderQuad(cardX, cardY, cardW, cardH, pauseBg, width, height);
+                
+                textRenderer.renderText(pauseText, cardX + 20.0f * UI_SCALE, cardY + 12.0f * UI_SCALE, pauseScale, pauseColor, width, height);
+            }
+
 
             // Swap buffers & poll events
             window.swapBuffers();

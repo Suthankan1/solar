@@ -58,9 +58,23 @@ void SunHalo::render(Renderer& renderer) {
 
     // Set emissiveStrength uniform to 1.2f
     shader.setFloat("emissiveStrength", 1.2f);
+    shader.setInt("planetId", 100); // Unique ID for SunHalo
+
+    // Compute billboarding model matrix centered at the origin
+    glm::mat4 view = renderer.getViewMatrix();
+    glm::mat4 model = glm::mat4(1.0f);
+    
+    // Column 0 matches local x to Camera Right
+    model[0] = glm::vec4(view[0][0], view[1][0], view[2][0], 0.0f);
+    // Column 1 matches local y (plane normal) to Camera -Forward
+    model[1] = glm::vec4(-view[0][2], -view[1][2], -view[2][2], 0.0f);
+    // Column 2 matches local z to Camera Up
+    model[2] = glm::vec4(view[0][1], view[1][1], view[2][1], 0.0f);
+    // Column 3 is translation (centered at the Sun's position, i.e., (0,0,0))
+    model[3] = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
 
     // Render unlit (useLighting=false)
-    renderer.render(*m_halo, shader, glm::mat4(1.0f));
+    renderer.render(*m_halo, shader, model);
 
     // Re-enable depth write
     glDepthMask(GL_TRUE);
@@ -72,4 +86,5 @@ void SunHalo::render(Renderer& renderer) {
     // Reset shader states
     shader.setBool("useColorOverride", false);
     shader.setFloat("emissiveStrength", 0.0f);
+    shader.setInt("planetId", -1);
 }

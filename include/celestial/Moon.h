@@ -2,6 +2,7 @@
 
 #include "scene/SceneObject.h"
 #include "scene/Transform.h"
+#include "core/Texture.h"
 #include <glm/glm.hpp>
 #include <memory>
 
@@ -13,7 +14,7 @@ class Planet;
  */
 class Moon : public SceneObject {
 public:
-    Moon(const std::string& name, float radius, float orbitRadius, float orbitSpeed, float rotationSpeed, const glm::vec3& color, std::shared_ptr<Planet> parentPlanet);
+    Moon(const std::string& name, float radius, float orbitRadius, float orbitSpeed, float rotationSpeed, const glm::vec3& color, std::shared_ptr<Planet> parentPlanet, const std::string& texturePath = "");
     virtual ~Moon() = default;
 
     void update(float deltaTime) override;
@@ -36,4 +37,5 @@ private:
     float m_orbitAngle;
     float m_rotationAngle;
     Transform m_transform;
+    std::unique_ptr<Texture> m_texture;
 };

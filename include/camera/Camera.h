@@ -81,6 +81,11 @@ public:
     TrackingCamera(const std::string& name, std::shared_ptr<Planet> target, const glm::vec3& offset);
     void update(float deltaTime) override;
     void render(Renderer&) override {}
+
+    // Public setters for planet target and camera offset
+    void setTargetPlanet(std::shared_ptr<Planet> target) { m_targetPlanet = target; }
+    void setOffset(const glm::vec3& offset) { m_offset = offset; }
+    std::shared_ptr<Planet> getTargetPlanet() const { return m_targetPlanet; }
 private:
     std::shared_ptr<Planet> m_targetPlanet;
     glm::vec3 m_offset;
@@ -99,4 +104,21 @@ private:
     float m_yaw;
     float m_pitch;
     float m_movementSpeed;
+};
+
+class Spacecraft;
+
+/**
+ * @class SpacecraftFollowCamera
+ * @brief A camera that trails behind the spacecraft and looks forward.
+ */
+class SpacecraftFollowCamera : public Camera {
+public:
+    SpacecraftFollowCamera(const std::string& name, std::shared_ptr<Spacecraft> target, float followDistance = 0.08f, float followHeight = 0.025f);
+    void update(float deltaTime) override;
+    void render(Renderer&) override {}
+private:
+    std::shared_ptr<Spacecraft> m_targetSpacecraft;
+    float m_followDistance;
+    float m_followHeight;
 };

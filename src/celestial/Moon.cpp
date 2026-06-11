@@ -5,7 +5,7 @@
 #include <cmath>
 #include <cstdlib>
 
-Moon::Moon(const std::string& name, float radius, float orbitRadius, float orbitSpeed, float rotationSpeed, const glm::vec3& color, std::shared_ptr<Planet> parentPlanet)
+Moon::Moon(const std::string& name, float radius, float orbitRadius, float orbitSpeed, float rotationSpeed, const glm::vec3& color, std::shared_ptr<Planet> parentPlanet, const std::string& texturePath)
     : SceneObject(name), m_orbitRadius(orbitRadius), m_orbitSpeed(orbitSpeed),
       m_rotationSpeed(rotationSpeed), m_color(color), m_parentPlanet(parentPlanet),
       m_orbitAngle(0.0f), m_rotationAngle(0.0f) {
@@ -13,6 +13,13 @@ Moon::Moon(const std::string& name, float radius, float orbitRadius, float orbit
     m_transform.setScale(glm::vec3(radius));
     if (m_parentPlanet) {
         m_transform.setParent(&m_parentPlanet->getTransform());
+    }
+
+    if (!texturePath.empty()) {
+        m_texture = std::make_unique<Texture>();
+        if (!m_texture->load(texturePath)) {
+            m_texture.reset(); // Falls back to color if load fails
+        }
     }
 }
 
@@ -36,6 +43,14 @@ void Moon::render(Renderer& renderer) {
 
     const Shader& shader = renderer.getShader();
     shader.use();
+
+    bool hasTexture = m_texture && m_texture->isValid();
+    shader.setBool("useTexture", hasTexture);
+    if (hasTexture) {
+        m_texture->bind(0);
+        shader.setInt("planetTexture", 0);
+    }
+
     shader.setBool("useColorOverride", true);
     shader.setVec3("colorOverride", m_color);
 
@@ -51,4 +66,7 @@ void Moon::render(Renderer& renderer) {
     renderer.renderWithLighting(renderer.getSphereMesh(), shader, model);
 
     shader.setBool("useColorOverride", false);
+    if (hasTexture) {
+        shader.setBool("useTexture", false);
+    }
 }

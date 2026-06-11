@@ -1,5 +1,6 @@
 #include "camera/Camera.h"
 #include "celestial/Planet.h"
+#include "celestial/Spacecraft.h"
 #include "core/Window.h"
 #include <glm/gtc/matrix_transform.hpp>
 #include <GLFW/glfw3.h>
@@ -129,4 +130,34 @@ void FreeCamera::update(float deltaTime) {
         m_position += m_up * velocity;
     if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS) // Descend
         m_position -= m_up * velocity;
+}
+
+// SpacecraftFollowCamera
+SpacecraftFollowCamera::SpacecraftFollowCamera(const std::string& name, std::shared_ptr<Spacecraft> target, float followDistance, float followHeight)
+    : Camera(name, glm::vec3(0.0f), glm::vec3(0.0f, 0.0f, -1.0f)), m_targetSpacecraft(target), m_followDistance(followDistance), m_followHeight(followHeight) {}
+
+void SpacecraftFollowCamera::update(float deltaTime) {
+    (void)deltaTime;
+    if (m_targetSpacecraft) {
+        glm::vec3 craftPos = m_targetSpacecraft->getPosition();
+        glm::vec3 craftForward = m_targetSpacecraft->getForwardDir();
+
+        // Follow behind the spacecraft and slightly above
+        glm::vec3 upOffset = glm::vec3(0.0f, m_followHeight, 0.0f);
+        m_position = craftPos - craftForward * m_followDistance + upOffset;
+
+        // Look slightly ahead of the spacecraft in its movement direction
+        glm::vec3 lookAtTarget = craftPos + craftForward * 0.05f;
+        
+        if (glm::length(lookAtTarget - m_position) > 0.0001f) {
+            m_front = glm::normalize(lookAtTarget - m_position);
+        } else {
+            m_front = craftForward;
+        }
+
+        // Align camera up vector with standard world up
+        glm::vec3 worldUp = glm::vec3(0.0f, 1.0f, 0.0f);
+        glm::vec3 right = glm::normalize(glm::cross(m_front, worldUp));
+        m_up = glm::normalize(glm::cross(right, m_front));
+    }
 }

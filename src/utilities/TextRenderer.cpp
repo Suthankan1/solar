@@ -26,10 +26,10 @@ bool TextRenderer::init() {
     std::vector<unsigned char> pixels(1024 * 8, 0);
     for (int c = 0; c < 128; ++c) {
         for (int row = 0; row < 8; ++row) {
-            unsigned char b = static_cast<unsigned char>(font8x8_basic[c][row]);
+            unsigned char b = (c == 127) ? 255 : static_cast<unsigned char>(font8x8_basic[c][row]);
             for (int col = 0; col < 8; ++col) {
                 // The LSB of the byte corresponds to the leftmost pixel
-                bool pixelOn = (b >> col) & 1;
+                bool pixelOn = (c == 127) ? true : ((b >> col) & 1);
                 // In font8x8, row 0 is top. In OpenGL texture, y = 0 is bottom.
                 int x = c * 8 + col;
                 int y = 7 - row;
@@ -65,7 +65,7 @@ bool TextRenderer::init() {
     return true;
 }
 
-void TextRenderer::renderText(const std::string& text, float x, float y, float scale, const glm::vec3& color, int screenWidth, int screenHeight) {
+void TextRenderer::renderText(const std::string& text, float x, float y, float scale, const glm::vec4& color, int screenWidth, int screenHeight) {
     if (!m_shader || m_VAO == 0 || m_VBO == 0 || m_textureID == 0) return;
 
     // Save current OpenGL states to prevent altering main scene rendering pipeline
@@ -81,7 +81,7 @@ void TextRenderer::renderText(const std::string& text, float x, float y, float s
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     m_shader->use();
-    m_shader->setVec3("textColor", color);
+    m_shader->setVec4("textColor", color);
     
     glm::mat4 projection = glm::ortho(0.0f, static_cast<float>(screenWidth), 0.0f, static_cast<float>(screenHeight));
     m_shader->setMat4("projection", projection);
@@ -141,5 +141,60 @@ void TextRenderer::renderText(const std::string& text, float x, float y, float s
     } else {
         glDisable(GL_BLEND);
     }
+    glBlendFunc(blendSrc, blendDst);
+}
+
+void TextRenderer::renderQuad(float x, float y, float w, float h, const glm::vec4& color, int screenWidth, int screenHeight) {
+    if (!m_shader || m_VAO == 0 || m_VBO == 0 || m_textureID == 0) return;
+
+    GLboolean depthTestEnabled = glIsEnabled(GL_DEPTH_TEST);
+    GLboolean blendEnabled = glIsEnabled(GL_BLEND);
+    GLint blendSrc, blendDst;
+    glGetIntegerv(GL_BLEND_SRC_ALPHA, &blendSrc);
+    glGetIntegerv(GL_BLEND_DST_ALPHA, &blendDst);
+
+    glDisable(GL_DEPTH_TEST);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    m_shader->use();
+    m_shader->setVec4("textColor", color);
+    
+    glm::mat4 projection = glm::ortho(0.0f, static_cast<float>(screenWidth), 0.0f, static_cast<float>(screenHeight));
+    m_shader->setMat4("projection", projection);
+
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, m_textureID);
+    m_shader->setInt("text", 0);
+
+    glBindVertexArray(m_VAO);
+    glBindBuffer(GL_ARRAY_BUFFER, m_VBO);
+
+    // Using character 127 (which we set to solid white)
+    float u0 = (127 * 8.0f) / 1024.0f;
+    float u1 = (127 * 8.0f + 8.0f) / 1024.0f;
+
+    float vertices[6][4] = {
+        { x,     y + h,   u0, 1.0f },
+        { x,     y,       u0, 0.0f },
+        { x + w, y,       u1, 0.0f },
+
+        { x,     y + h,   u0, 1.0f },
+        { x + w, y,       u1, 0.0f },
+        { x + w, y + h,   u1, 1.0f }
+    };
+
+    glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vertices), vertices);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindVertexArray(0);
+    glBindTexture(GL_TEXTURE_2D, 0);
+
+    if (depthTestEnabled) glEnable(GL_DEPTH_TEST);
+    else glDisable(GL_DEPTH_TEST);
+    
+    if (blendEnabled) glEnable(GL_BLEND);
+    else glDisable(GL_BLEND);
     glBlendFunc(blendSrc, blendDst);
 }

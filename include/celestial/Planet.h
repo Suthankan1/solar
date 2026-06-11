@@ -2,7 +2,9 @@
 
 #include "scene/SceneObject.h"
 #include "scene/Transform.h"
+#include "core/Texture.h"
 #include <glm/glm.hpp>
+#include <memory>
 
 /**
  * @class Planet
@@ -18,8 +20,9 @@ public:
      * @param orbitSpeed Orbital revolution speed
      * @param rotationSpeed Self-rotation speed
      * @param color Base rendering color
+     * @param texturePath Path to texture image file
      */
-    Planet(const std::string& name, float radius, float orbitRadius, float orbitSpeed, float rotationSpeed, const glm::vec3& color);
+    Planet(const std::string& name, float radius, float orbitRadius, float orbitSpeed, float rotationSpeed, const glm::vec3& color, const std::string& texturePath = "");
     virtual ~Planet() = default;
 
     void update(float deltaTime) override;
@@ -37,6 +40,7 @@ private:
     float m_orbitSpeed;
     float m_rotationSpeed;
     glm::vec3 m_color;
+    std::unique_ptr<Texture> m_texture;
 
     float m_orbitAngle;
     float m_rotationAngle;

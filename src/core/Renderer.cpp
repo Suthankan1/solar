@@ -1,4 +1,5 @@
 #include "core/Renderer.h"
+#include <GLFW/glfw3.h>
 #include <iostream>
 #include <cmath>
 #include <glm/gtc/matrix_transform.hpp>
@@ -48,11 +49,12 @@ void Renderer::render(const Mesh& mesh, const Shader& shader, const glm::mat4& m
     shader.setMat4("view", view);
     shader.setMat4("projection", projection);
     shader.setBool("useLighting", false);
-    shader.setInt("planetId", -1);
+    shader.setFloat("time", (float)glfwGetTime());
 
     mesh.draw();
 
     shader.setFloat("globalAlpha", 1.0f);
+    shader.setInt("planetId", -1);
 }
 
 /*
@@ -71,11 +73,15 @@ void Renderer::renderWithLighting(const Mesh& mesh, const Shader& shader,
     shader.setVec3("lightPos", lightPos);
     shader.setVec3("lightColor", lightColor);
     shader.setVec3("viewPos", viewPos);
-    shader.setInt("planetId", -1);
+    shader.setFloat("lightConstant", m_lightConstant);
+    shader.setFloat("lightLinear", m_lightLinear);
+    shader.setFloat("lightQuadratic", m_lightQuadratic);
+    shader.setFloat("time", (float)glfwGetTime());
 
     mesh.draw();
 
     shader.setFloat("globalAlpha", 1.0f);
+    shader.setInt("planetId", -1);
 }
 
 void Renderer::render(const Mesh& mesh, const Shader& shader, const glm::mat4& model) {
@@ -120,7 +126,7 @@ Mesh Renderer::createSphere(float radius, unsigned int rings, unsigned int secto
                 0.9f + 0.1f * (z * 0.5f + 0.5f)
             );
             
-            vertex.texCoords = glm::vec2((float)s / (float)(sectors - 1), (float)r / (float)(rings - 1));
+            vertex.texCoords = glm::vec2((float)s / (float)(sectors - 1), 1.0f - (float)r / (float)(rings - 1));
 
             vertices.push_back(vertex);
         }

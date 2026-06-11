@@ -23,6 +23,8 @@ set(SOURCES
     src/core/Renderer.cpp
     src/core/Shader.cpp
     src/core/Mesh.cpp
+    src/core/Texture.cpp
+    include/core/Texture.h
     src/core/RendererComponent.cpp
     src/scene/SceneManager.cpp
     src/scene/Transform.cpp
@@ -32,6 +34,10 @@ set(SOURCES
     src/camera/Camera.cpp
     src/celestial/Planet.cpp
     src/celestial/Moon.cpp
+    src/celestial/SpaceStation.cpp
+    include/celestial/SpaceStation.h
+    src/celestial/Spacecraft.cpp
+    include/celestial/Spacecraft.h
     src/celestial/Sun.cpp
     src/celestial/Orbit.cpp
     src/celestial/Starfield.cpp
@@ -41,6 +47,10 @@ set(SOURCES
     include/celestial/SunHalo.h
     src/celestial/AsteroidBelt.cpp
     include/celestial/AsteroidBelt.h
+    src/celestial/CloudLayer.cpp
+    include/celestial/CloudLayer.h
+    src/celestial/AtmosphereLayer.cpp
+    include/celestial/AtmosphereLayer.h
     src/animation/AnimationComponent.cpp
     src/lighting/LightingComponent.cpp
     src/utilities/TextRenderer.cpp

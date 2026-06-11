@@ -14,6 +14,7 @@ CPPSRC = src/main.cpp \
          src/core/Renderer.cpp \
          src/core/Shader.cpp \
          src/core/Mesh.cpp \
+         src/core/Texture.cpp \
          src/core/RendererComponent.cpp \
          src/scene/SceneManager.cpp \
          src/scene/Transform.cpp \
@@ -23,12 +24,16 @@ CPPSRC = src/main.cpp \
          src/camera/Camera.cpp \
          src/celestial/Planet.cpp \
          src/celestial/Moon.cpp \
+         src/celestial/SpaceStation.cpp \
          src/celestial/Sun.cpp \
          src/celestial/Orbit.cpp \
          src/celestial/Starfield.cpp \
          src/celestial/SaturnRings.cpp \
          src/celestial/SunHalo.cpp \
          src/celestial/AsteroidBelt.cpp \
+         src/celestial/CloudLayer.cpp \
+         src/celestial/AtmosphereLayer.cpp \
+         src/celestial/Spacecraft.cpp \
          src/animation/AnimationComponent.cpp \
          src/lighting/LightingComponent.cpp \
          src/utilities/TextRenderer.cpp

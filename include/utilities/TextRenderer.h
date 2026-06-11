@@ -17,7 +17,11 @@ public:
     TextRenderer& operator=(const TextRenderer&) = delete;
 
     bool init();
-    void renderText(const std::string& text, float x, float y, float scale, const glm::vec3& color, int screenWidth, int screenHeight);
+    void renderText(const std::string& text, float x, float y, float scale, const glm::vec3& color, int screenWidth, int screenHeight) {
+        renderText(text, x, y, scale, glm::vec4(color, 1.0f), screenWidth, screenHeight);
+    }
+    void renderText(const std::string& text, float x, float y, float scale, const glm::vec4& color, int screenWidth, int screenHeight);
+    void renderQuad(float x, float y, float w, float h, const glm::vec4& color, int screenWidth, int screenHeight);
 
 private:
     std::unique_ptr<Shader> m_shader;

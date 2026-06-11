@@ -32,6 +32,7 @@ public:
     Mesh& operator=(const Mesh&) = delete;
 
     void draw() const;
+    void updateVertices(const std::vector<Vertex>& newVertices);
     void cleanup();
 
 private:

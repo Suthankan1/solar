@@ -87,6 +87,14 @@ void Mesh::draw() const {
     glBindVertexArray(0);
 }
 
+void Mesh::updateVertices(const std::vector<Vertex>& newVertices) {
+    this->vertices = newVertices;
+    if (VBO != 0) {
+        glBindBuffer(GL_ARRAY_BUFFER, VBO);
+        glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(Vertex), &vertices[0], GL_STATIC_DRAW);
+    }
+}
+
 void Mesh::cleanup() {
     if (VAO != 0) {
         glDeleteVertexArrays(1, &VAO);

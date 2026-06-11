@@ -29,12 +29,20 @@ public:
         m_lightPosition = pos;
         m_lightColor = color;
     }
+    void setLightAttenuation(float constant, float linear, float quadratic) {
+        m_lightConstant = constant;
+        m_lightLinear = linear;
+        m_lightQuadratic = quadratic;
+    }
 
     const glm::mat4& getViewMatrix() const { return m_viewMatrix; }
     const glm::mat4& getProjectionMatrix() const { return m_projMatrix; }
     const glm::vec3& getCameraPosition() const { return m_cameraPosition; }
     const glm::vec3& getLightPosition() const { return m_lightPosition; }
     const glm::vec3& getLightColor() const { return m_lightColor; }
+    float getLightConstant() const { return m_lightConstant; }
+    float getLightLinear() const { return m_lightLinear; }
+    float getLightQuadratic() const { return m_lightQuadratic; }
 
     // Access to internal resources
     const Shader& getShader() const { return *m_shader; }
@@ -67,4 +75,7 @@ private:
     glm::vec3 m_cameraPosition = glm::vec3(0.0f);
     glm::vec3 m_lightPosition = glm::vec3(0.0f);
     glm::vec3 m_lightColor = glm::vec3(1.0f);
+    float m_lightConstant = 1.0f;
+    float m_lightLinear = 0.05f;
+    float m_lightQuadratic = 0.005f;
 };

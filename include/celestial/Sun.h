@@ -2,7 +2,9 @@
 
 #include "scene/SceneObject.h"
 #include "scene/Transform.h"
+#include "core/Texture.h"
 #include <glm/glm.hpp>
+#include <memory>
 
 /**
  * @class Sun
@@ -10,7 +12,7 @@
  */
 class Sun : public SceneObject {
 public:
-    Sun(const std::string& name, float radius, const glm::vec3& color, const glm::vec3& lightColor = glm::vec3(1.0f));
+    Sun(const std::string& name, float radius, const glm::vec3& color, const glm::vec3& lightColor = glm::vec3(1.0f), const std::string& texturePath = "");
     virtual ~Sun() = default;
 
     void update(float deltaTime) override;
@@ -28,4 +30,5 @@ private:
     Transform m_transform;
     float m_rotationAngle = 0.0f;
     float m_rotationSpeed = 0.1f;
+    std::unique_ptr<Texture> m_texture;
 };

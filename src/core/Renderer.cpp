@@ -2,6 +2,7 @@
 #include <GLFW/glfw3.h>
 #include <iostream>
 #include <cmath>
+#include <algorithm>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
@@ -178,7 +179,7 @@ void Renderer::endFrame(bool bloomEnabled, float vignetteStrength) {
 
     int lastWrittenTextureIdx = 0;
     bool horizontal = true, firstPass = true;
-    unsigned int amount = 10; // 5 full horizontal/vertical iterations
+    unsigned int amount = 6; // 3 full horizontal/vertical iterations on downsampled bloom buffers
 
     if (bloomEnabled && m_blurShader) {
         m_blurShader->use();
@@ -187,6 +188,7 @@ void Renderer::endFrame(bool bloomEnabled, float vignetteStrength) {
         glDisable(GL_DEPTH_TEST); // No depth test for 2D screen passes
         for (unsigned int i = 0; i < amount; i++) {
             glBindFramebuffer(GL_FRAMEBUFFER, m_pingpongFBO[horizontal]);
+            glViewport(0, 0, m_blurWidth, m_blurHeight);
             m_blurShader->setBool("horizontal", horizontal);
             m_blurShader->setBool("firstPass", firstPass);
             
@@ -207,6 +209,7 @@ void Renderer::endFrame(bool bloomEnabled, float vignetteStrength) {
     if (m_bloomShader) {
         m_bloomShader->use();
         glDisable(GL_DEPTH_TEST);
+        glViewport(0, 0, m_fboWidth, m_fboHeight);
 
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, m_hdrColorBuffer);
@@ -318,6 +321,8 @@ void Renderer::createFBOs(int width, int height) {
 
     m_fboWidth = width;
     m_fboHeight = height;
+    m_blurWidth = std::max(1, width / 2);
+    m_blurHeight = std::max(1, height / 2);
 
     // Create HDR Framebuffer
     glGenFramebuffers(1, &m_hdrFBO);
@@ -351,7 +356,7 @@ void Renderer::createFBOs(int width, int height) {
     for (unsigned int i = 0; i < 2; ++i) {
         glBindFramebuffer(GL_FRAMEBUFFER, m_pingpongFBO[i]);
         glBindTexture(GL_TEXTURE_2D, m_pingpongColorBuffers[i]);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0, GL_RGBA, GL_FLOAT, NULL);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, m_blurWidth, m_blurHeight, 0, GL_RGBA, GL_FLOAT, NULL);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);

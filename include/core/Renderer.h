@@ -90,6 +90,8 @@ private:
     unsigned int m_pingpongColorBuffers[2] = {0, 0};
     int m_fboWidth = 0;
     int m_fboHeight = 0;
+    int m_blurWidth = 0;
+    int m_blurHeight = 0;
 
     unsigned int m_quadVAO = 0;
     unsigned int m_quadVBO = 0;

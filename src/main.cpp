@@ -248,6 +248,7 @@ int main() {
         double lastTime = glfwGetTime();
         double lastFPSTime = lastTime;
         int frameCount = 0;
+        float smoothedDeltaTime = 1.0f / 60.0f;
 
         float animationSpeed = 1.0f;   // multiplier
         bool  animationPaused = false;
@@ -534,8 +535,11 @@ int main() {
         // Main render loop
         while (!window.shouldClose()) {
             double currentTime = glfwGetTime();
-            float deltaTime = static_cast<float>(currentTime - lastTime);
+            float rawDeltaTime = static_cast<float>(currentTime - lastTime);
             lastTime = currentTime;
+            float clampedDeltaTime = glm::clamp(rawDeltaTime, 0.001f, 1.0f / 20.0f);
+            smoothedDeltaTime = glm::mix(smoothedDeltaTime, clampedDeltaTime, 0.12f);
+            float deltaTime = smoothedDeltaTime;
 
             GLFWwindow* glWin = window.getGLFWWindow();
 

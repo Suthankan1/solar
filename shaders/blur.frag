@@ -7,51 +7,37 @@ uniform bool horizontal;
 uniform bool firstPass;
 uniform float threshold = 0.85;
 
-// 5-tap Gaussian blur weights
-uniform float weight[5] = float[] (0.2270270270, 0.1945945946, 0.1216216216, 0.0540540541, 0.0162162162);
+uniform float weight[7] = float[] (0.0625, 0.125, 0.1875, 0.25, 0.1875, 0.125, 0.0625);
 
 vec3 extractBright(vec3 color) {
-    float brightness = max(color.r, max(color.g, color.b));
-    // Soft knee threshold to prevent harsh cutoffs
-    float knee = 0.1;
-    float soft = brightness - threshold + knee;
-    soft = clamp(soft, 0.0, 2.0 * knee);
-    soft = soft * soft / (4.0 * knee + 0.00001);
-    float contribution = max(soft, brightness - threshold) / max(brightness, 0.00001);
-    return color * contribution;
+    float brightness = dot(color.rgb, vec3(0.2126, 0.7152, 0.0722));
+    if (brightness > threshold) {
+        return color;
+    }
+    return vec3(0.0);
 }
 
 void main() {             
     vec2 tex_offset = 1.0 / textureSize(image, 0); // gets size of single texel
-    vec3 result;
-    
-    if (firstPass) {
-        result = extractBright(texture(image, TexCoords).rgb) * weight[0];
-    } else {
-        result = texture(image, TexCoords).rgb * weight[0];
-    }
+    vec3 result = vec3(0.0);
     
     if (horizontal) {
-        for (int i = 1; i < 5; ++i) {
-            vec2 offset = vec2(tex_offset.x * i, 0.0);
-            vec3 c1 = texture(image, TexCoords + offset).rgb;
-            vec3 c2 = texture(image, TexCoords - offset).rgb;
+        for (int i = -3; i <= 3; ++i) {
+            vec2 offset = vec2(tex_offset.x * float(i), 0.0);
+            vec3 color = texture(image, TexCoords + offset).rgb;
             if (firstPass) {
-                result += (extractBright(c1) + extractBright(c2)) * weight[i];
-            } else {
-                result += (c1 + c2) * weight[i];
+                color = extractBright(color);
             }
+            result += color * weight[i + 3];
         }
     } else {
-        for (int i = 1; i < 5; ++i) {
-            vec2 offset = vec2(0.0, tex_offset.y * i);
-            vec3 c1 = texture(image, TexCoords + offset).rgb;
-            vec3 c2 = texture(image, TexCoords - offset).rgb;
+        for (int i = -3; i <= 3; ++i) {
+            vec2 offset = vec2(0.0, tex_offset.y * float(i));
+            vec3 color = texture(image, TexCoords + offset).rgb;
             if (firstPass) {
-                result += (extractBright(c1) + extractBright(c2)) * weight[i];
-            } else {
-                result += (c1 + c2) * weight[i];
+                color = extractBright(color);
             }
+            result += color * weight[i + 3];
         }
     }
     FragColor = vec4(result, 1.0);

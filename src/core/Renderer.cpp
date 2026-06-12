@@ -10,10 +10,10 @@ Renderer::Renderer()
       m_earthShader(nullptr),
       m_sphereMesh(nullptr),
       m_lightPosition(0.0f),
-      m_lightColor(1.5f, 1.4f, 1.2f),
+      m_lightColor(2.2f, 2.0f, 1.7f),
       m_lightConstant(1.0f),
-      m_lightLinear(0.014f),
-      m_lightQuadratic(0.0007f) {}
+      m_lightLinear(0.007f),
+      m_lightQuadratic(0.0002f) {}
 
 Renderer::~Renderer() {
     cleanup();
@@ -95,6 +95,7 @@ void Renderer::renderWithLighting(const Mesh& mesh, const Shader& shader,
     shader.setVec3("lightPos", lightPos);
     shader.setVec3("lightColor", lightColor);
     shader.setVec3("viewPos", viewPos);
+    shader.setFloat("ambientStrength", 0.015f);
     shader.setFloat("lightConstant", m_lightConstant);
     shader.setFloat("lightLinear", m_lightLinear);
     shader.setFloat("lightQuadratic", m_lightQuadratic);
@@ -216,8 +217,8 @@ void Renderer::endFrame(bool bloomEnabled) {
         m_bloomShader->setInt("bloomBlur", 1);
         
         m_bloomShader->setBool("bloom", bloomEnabled);
-        m_bloomShader->setFloat("exposure", 1.0f);
-        m_bloomShader->setFloat("bloomIntensity", 0.45f);
+        m_bloomShader->setFloat("exposure", 1.2f);
+        m_bloomShader->setFloat("bloomIntensity", 0.8f);
 
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         renderQuad();

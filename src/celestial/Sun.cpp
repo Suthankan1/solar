@@ -1,6 +1,7 @@
 #include "celestial/Sun.h"
 #include "core/Renderer.h"
 #include "core/Shader.h"
+#include <GLFW/glfw3.h>
 #include <glm/gtc/matrix_transform.hpp>
 
 Sun::Sun(const std::string& name, float radius, const glm::vec3& color, const glm::vec3& lightColor, const std::string& texturePath)
@@ -41,6 +42,7 @@ void Sun::render(Renderer& renderer) {
     shader.setBool("useColorOverride", true);
     shader.setVec3("colorOverride", m_color);
     shader.setInt("planetId", 0);
+    shader.setFloat("time", static_cast<float>(glfwGetTime()));
 
     // Star does not get lit by itself, render it unlit
     renderer.render(renderer.getSphereMesh(), shader, model);

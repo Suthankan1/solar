@@ -4,6 +4,7 @@
 #include "core/Mesh.h"
 #include <memory>
 #include <string>
+#include <vector>
 
 class SunHalo : public SceneObject {
 public:
@@ -13,5 +14,6 @@ public:
     void render(Renderer& renderer) override;
 
 private:
-    std::unique_ptr<Mesh> m_halo;
+    std::vector<std::unique_ptr<Mesh>> m_haloLayers;
+    std::unique_ptr<Mesh> m_flareQuad;
 };

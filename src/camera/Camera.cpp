@@ -133,31 +133,49 @@ void FreeCamera::update(float deltaTime) {
 }
 
 // SpacecraftFollowCamera
-SpacecraftFollowCamera::SpacecraftFollowCamera(const std::string& name, std::shared_ptr<Spacecraft> target, float followDistance, float followHeight)
-    : Camera(name, glm::vec3(0.0f), glm::vec3(0.0f, 0.0f, -1.0f)), m_targetSpacecraft(target), m_followDistance(followDistance), m_followHeight(followHeight) {}
+SpacecraftFollowCamera::SpacecraftFollowCamera(const std::string& name, std::shared_ptr<Spacecraft> target, float, float)
+    : Camera(name, glm::vec3(0.0f), glm::vec3(0.0f, 0.0f, -1.0f)), m_targetSpacecraft(target) {}
 
 void SpacecraftFollowCamera::update(float deltaTime) {
-    (void)deltaTime;
     if (m_targetSpacecraft) {
         glm::vec3 craftPos = m_targetSpacecraft->getPosition();
         glm::vec3 craftForward = m_targetSpacecraft->getForwardDir();
+        if (glm::length(craftForward) > 0.0001f) {
+            craftForward = glm::normalize(craftForward);
+        } else {
+            craftForward = m_front;
+        }
 
-        // Follow behind the spacecraft and slightly above
-        glm::vec3 upOffset = glm::vec3(0.0f, m_followHeight, 0.0f);
-        m_position = craftPos - craftForward * m_followDistance + upOffset;
+        glm::vec3 worldUp = glm::vec3(0.0f, 1.0f, 0.0f);
+        glm::vec3 right = glm::cross(craftForward, worldUp);
+        if (glm::length(right) < 0.0001f) {
+            right = glm::cross(m_front, worldUp);
+        }
+        if (glm::length(right) < 0.0001f) {
+            right = glm::vec3(1.0f, 0.0f, 0.0f);
+        } else {
+            right = glm::normalize(right);
+        }
+
+        glm::vec3 idealPos = craftPos - craftForward * 0.15f + worldUp * 0.05f + right * 0.03f;
+        float alpha = glm::clamp(0.05f * deltaTime * 60.0f, 0.0f, 1.0f);
+        m_position = glm::mix(m_position, idealPos, alpha);
 
         // Look slightly ahead of the spacecraft in its movement direction
         glm::vec3 lookAtTarget = craftPos + craftForward * 0.05f;
-        
-        if (glm::length(lookAtTarget - m_position) > 0.0001f) {
-            m_front = glm::normalize(lookAtTarget - m_position);
-        } else {
-            m_front = craftForward;
+        glm::vec3 front = lookAtTarget - m_position;
+        if (glm::length(front) > 0.0001f) {
+            front = glm::normalize(front);
+            m_front = glm::normalize(glm::mix(m_front, front, glm::clamp(alpha * 1.5f, 0.0f, 1.0f)));
         }
 
-        // Align camera up vector with standard world up
-        glm::vec3 worldUp = glm::vec3(0.0f, 1.0f, 0.0f);
-        glm::vec3 right = glm::normalize(glm::cross(m_front, worldUp));
-        m_up = glm::normalize(glm::cross(right, m_front));
+        // Keep a stable world-up horizon to avoid follow-camera roll/gimbal jitter.
+        glm::vec3 viewRight = glm::cross(m_front, worldUp);
+        if (glm::length(viewRight) > 0.0001f) {
+            viewRight = glm::normalize(viewRight);
+            m_up = glm::normalize(glm::cross(viewRight, m_front));
+        } else {
+            m_up = worldUp;
+        }
     }
 }

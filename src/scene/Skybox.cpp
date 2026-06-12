@@ -39,8 +39,6 @@ void Skybox::render(Renderer& renderer) {
 
     // Change depth mask/function so skybox is rendered behind everything
     glDepthMask(GL_FALSE);
-    GLint prevDepthFunc;
-    glGetIntegerv(GL_DEPTH_FUNC, &prevDepthFunc);
     glDepthFunc(GL_LEQUAL);
 
     // Draw skybox cube
@@ -49,7 +47,7 @@ void Skybox::render(Renderer& renderer) {
     glBindVertexArray(0);
 
     // Restore depth state
-    glDepthFunc(prevDepthFunc);
+    glDepthFunc(GL_LESS);
     glDepthMask(GL_TRUE);
 }
 

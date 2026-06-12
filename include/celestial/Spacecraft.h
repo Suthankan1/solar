@@ -39,6 +39,8 @@ private:
     std::shared_ptr<Planet> m_earth;
     std::shared_ptr<Planet> m_mars;
     float m_progress; // ranges from 0.0f (Earth) to 1.0f (Mars)
+    bool m_reversed = false; // true while returning from Mars to Earth
+    float m_arrivalFlash = 0.0f;
     float m_rollAngle; // subtle roll rotation (barbecue roll)
 
     glm::vec3 m_position;
@@ -52,6 +54,7 @@ private:
 
     // Trajectory path line rendering
     std::unique_ptr<Mesh> m_trajectoryMesh;
+    std::vector<Vertex> m_trajVertices;
 
     // Curve evaluation helpers
     glm::vec3 getPositionForT(float t) const;

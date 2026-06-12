@@ -3,6 +3,7 @@
 #include "core/Renderer.h"
 #include <GLFW/glfw3.h>
 #include <glm/gtc/matrix_transform.hpp>
+#include <algorithm>
 #include <cmath>
 
 Spacecraft::Spacecraft(const std::string& name, std::shared_ptr<Planet> earth, std::shared_ptr<Planet> mars)
@@ -14,16 +15,16 @@ Spacecraft::Spacecraft(const std::string& name, std::shared_ptr<Planet> earth, s
     m_coneMesh = std::make_unique<Mesh>(createUnitCone(16));
 
     // Create trajectory mesh with 101 vertices (100 segments)
-    std::vector<Vertex> trajVertices(101);
+    m_trajVertices.resize(101);
     std::vector<unsigned int> trajIndices;
     for (unsigned int i = 0; i <= 100; ++i) {
         trajIndices.push_back(i);
-        trajVertices[i].position = glm::vec3(0.0f);
-        trajVertices[i].normal = glm::vec3(0.0f, 1.0f, 0.0f);
-        trajVertices[i].color = glm::vec3(0.0f, 0.8f, 1.0f); // Neon cyan path
-        trajVertices[i].texCoords = glm::vec2((float)i / 100.0f, 0.0f);
+        m_trajVertices[i].position = glm::vec3(0.0f);
+        m_trajVertices[i].normal = glm::vec3(0.0f, 1.0f, 0.0f);
+        m_trajVertices[i].color = glm::vec3(0.0f, 0.8f, 1.0f); // Neon cyan path
+        m_trajVertices[i].texCoords = glm::vec2((float)i / 100.0f, 0.0f);
     }
-    m_trajectoryMesh = std::make_unique<Mesh>(trajVertices, trajIndices, GL_LINE_STRIP);
+    m_trajectoryMesh = std::make_unique<Mesh>(m_trajVertices, trajIndices, GL_LINE_STRIP);
 
     // Initial update to place the spacecraft correctly at start
     update(0.0f);
@@ -32,26 +33,29 @@ Spacecraft::Spacecraft(const std::string& name, std::shared_ptr<Planet> earth, s
 glm::vec3 Spacecraft::getPositionForT(float t) const {
     if (!m_earth || !m_mars) return glm::vec3(0.0f);
 
-    // Get current orbital parameters of Earth and Mars
-    float eAngle = m_earth->getOrbitAngle();
-    float eSpeed = m_earth->getOrbitSpeed();
-    float mAngle = m_mars->getOrbitAngle();
-    float mSpeed = m_mars->getOrbitSpeed();
+    const std::shared_ptr<Planet>& departure = m_reversed ? m_mars : m_earth;
+    const std::shared_ptr<Planet>& arrival = m_reversed ? m_earth : m_mars;
+
+    // Get current orbital parameters of the departure and arrival planets.
+    float depAngle = departure->getOrbitAngle();
+    float depSpeed = departure->getOrbitSpeed();
+    float arrAngle = arrival->getOrbitAngle();
+    float arrSpeed = arrival->getOrbitSpeed();
 
     // Mission duration in simulation seconds (matching the 30-second loop)
     float T = 30.0f;
 
-    // We want the trajectory to be defined by departure from Earth at t=0 (offset by -m_progress * T)
-    // and arrival at Mars at t=1 (offset by +(1.0f - m_progress) * T)
-    float dtDep = -m_progress * T;
-    float dtArr = (1.0f - m_progress) * T;
+    // Define the active leg from its departure planet at t=0 to its arrival planet at t=1.
+    float legProgress = m_reversed ? (1.0f - m_progress) : m_progress;
+    float dtDep = -legProgress * T;
+    float dtArr = (1.0f - legProgress) * T;
 
-    float angleDep = eAngle + eSpeed * dtDep;
-    float angleArr = mAngle + mSpeed * dtArr;
+    float angleDep = depAngle + depSpeed * dtDep;
+    float angleArr = arrAngle + arrSpeed * dtArr;
 
     // Get 3D positions of the planets at departure and arrival times
-    glm::vec3 P_dep = getPlanetPositionAtAngle(m_earth, angleDep);
-    glm::vec3 P_arr = getPlanetPositionAtAngle(m_mars, angleArr);
+    glm::vec3 P_dep = getPlanetPositionAtAngle(departure, angleDep);
+    glm::vec3 P_arr = getPlanetPositionAtAngle(arrival, angleArr);
 
     // Calculate polar angles in the XZ plane
     float phi_dep = std::atan2(P_dep.z, P_dep.x);
@@ -98,18 +102,25 @@ glm::vec3 Spacecraft::getTangentForT(float t) const {
 }
 
 void Spacecraft::update(float deltaTime) {
-    // 30 seconds for a complete roundtrip (speed = 1.0f / 30.0f)
-    float speed = 0.0333f;
-    m_progress += speed * deltaTime;
-    if (m_progress > 1.0f) {
-        m_progress = 0.0f; // restart mission
+    float speed = 0.003f * deltaTime;
+    m_progress += m_reversed ? -speed : speed;
+    if (m_progress >= 1.0f) {
+        m_progress = 1.0f;
+        m_reversed = true;
+        m_arrivalFlash = 0.5f;
     }
+    if (m_progress <= 0.0f) {
+        m_progress = 0.0f;
+        m_reversed = false;
+    }
+    m_arrivalFlash = std::max(0.0f, m_arrivalFlash - deltaTime);
 
     // Accumulate subtle roll rotation over time (barbecue roll)
     m_rollAngle += 0.15f * deltaTime;
 
-    m_position = getPositionForT(m_progress);
-    m_forward = getTangentForT(m_progress);
+    float legT = m_reversed ? (1.0f - m_progress) : m_progress;
+    m_position = getPositionForT(legT);
+    m_forward = getTangentForT(legT);
 
     m_transform.setPosition(m_position);
 
@@ -118,18 +129,21 @@ void Spacecraft::update(float deltaTime) {
     float yaw = std::atan2(m_forward.x, m_forward.z);
     m_transform.setRotation(glm::vec3(pitch, yaw, m_rollAngle));
 
-    // Update trajectory line mesh vertices dynamically based on moving planets
-    std::vector<Vertex> newVertices;
+    // Preview only the remaining Hohmann transfer arc ahead of the spacecraft.
+    float remaining = 1.0f - legT;
     for (int i = 0; i <= 100; ++i) {
-        float t = (float)i / 100.0f;
-        Vertex v;
-        v.position = getPositionForT(t);
-        v.normal = glm::vec3(0.0f, 1.0f, 0.0f);
-        v.color = glm::vec3(0.0f, 0.8f, 1.0f);
-        v.texCoords = glm::vec2(t, 0.0f);
-        newVertices.push_back(v);
+        float fade = static_cast<float>(i) / 100.0f;
+        float t = legT + fade * remaining;
+        t = glm::clamp(t, 0.0f, 1.0f);
+
+        m_trajVertices[i].position = getPositionForT(t);
+        m_trajVertices[i].normal = glm::vec3(0.0f, 1.0f, 0.0f);
+        m_trajVertices[i].color = glm::mix(glm::vec3(0.0f, 0.9f, 1.0f),
+                                           glm::vec3(0.0f, 0.3f, 0.5f),
+                                           fade);
+        m_trajVertices[i].texCoords = glm::vec2(fade, 0.0f);
     }
-    m_trajectoryMesh->updateVertices(newVertices);
+    m_trajectoryMesh->updateVertices(m_trajVertices);
 }
 
 void Spacecraft::render(Renderer& renderer) {
@@ -138,12 +152,11 @@ void Spacecraft::render(Renderer& renderer) {
     const Shader& shader = renderer.getShader();
     shader.use();
 
-    // --- 1. Draw Mission Trajectory Line (Cyan Glow, semi-transparent) ---
+    // --- 1. Draw Mission Trajectory Line (faint cyan-to-blue future preview) ---
     shader.setBool("useTexture", false);
-    shader.setBool("useColorOverride", true);
-    shader.setVec3("colorOverride", glm::vec3(0.0f, 0.75f, 1.0f));
+    shader.setBool("useColorOverride", false);
     shader.setFloat("emissiveStrength", 1.2f);
-    shader.setFloat("globalAlpha", 0.4f);
+    shader.setFloat("globalAlpha", 0.35f);
     shader.setInt("planetId", -1);
 
     // Disable depth write temporarily to make the trajectory blend smoothly
@@ -156,6 +169,7 @@ void Spacecraft::render(Renderer& renderer) {
 
     // --- 2. Draw Spacecraft Model Components ---
     glm::mat4 modelBase = m_transform.getModelMatrix();
+    shader.setBool("useColorOverride", true);
 
     auto renderCube = [&](const glm::mat4& parent, const glm::vec3& offset, const glm::vec3& scale,
                           const glm::vec3& rotation, const glm::vec3& color) {
@@ -233,13 +247,19 @@ void Spacecraft::render(Renderer& renderer) {
     // Animated ion exhaust plume behind the aft thruster.
     float plumeScale = 0.8f + 0.2f * std::sin(static_cast<float>(glfwGetTime()) * 12.0f);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE);
-    shader.setFloat("emissiveStrength", 1.2f);
-    shader.setFloat("globalAlpha", 0.7f * plumeScale);
-    shader.setVec3("colorOverride", glm::vec3(0.5f, 0.8f, 1.0f));
+    float flashStrength = glm::clamp(m_arrivalFlash / 0.5f, 0.0f, 1.0f);
+    glm::vec3 exhaustColor = glm::mix(glm::vec3(0.5f, 0.8f, 1.0f),
+                                      glm::vec3(1.0f, 0.45f, 0.08f),
+                                      flashStrength);
+    shader.setFloat("emissiveStrength", 1.2f + 1.0f * flashStrength);
+    shader.setFloat("globalAlpha", (0.7f + 0.25f * flashStrength) * plumeScale);
+    shader.setVec3("colorOverride", exhaustColor);
 
     glm::mat4 plumeMat = glm::translate(modelBase, glm::vec3(0.0f, 0.0f, -0.022f));
     plumeMat = glm::rotate(plumeMat, glm::radians(-90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
-    plumeMat = glm::scale(plumeMat, glm::vec3(0.004f, 0.008f * plumeScale, 0.004f));
+    plumeMat = glm::scale(plumeMat, glm::vec3(0.004f + 0.003f * flashStrength,
+                                              (0.008f + 0.006f * flashStrength) * plumeScale,
+                                              0.004f + 0.003f * flashStrength));
     renderer.renderWithLighting(*m_coneMesh, shader, plumeMat);
 
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);

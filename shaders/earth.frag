@@ -210,12 +210,12 @@ void main() {
         vec3 specularGlint = specularVal * specFactor * lightColor * dayWeight * attenuation;
         finalColor += specularGlint;
 
-        // 6. Atmospheric Rim Glow (Subtle blue scattering layer on Earth edge)
-        float rim = 1.0 - max(dot(viewDir, norm), 0.0);
-        rim = pow(rim, 5.0);
-        vec3 blueRimGlowColor = vec3(0.28, 0.58, 1.0);
-        vec3 rimGlow = blueRimGlowColor * rim * 1.6 * dayWeight * attenuation;
-        finalColor += rimGlow;
+        // 6. Atmospheric Rim Glow (blue scattering at the Earth limb)
+        float rimDot = max(dot(normalize(viewDir), normalize(Normal)), 0.0);
+        float rim = 1.0 - rimDot;
+        vec3 atmosBlue = vec3(0.25, 0.55, 1.0) * pow(rim, 3.0) * 2.0;
+        vec3 oxyGreen = vec3(0.30, 1.00, 0.4) * step(0.92, rim) * 0.4 * (rim - 0.92) / 0.08;
+        finalColor += atmosBlue + oxyGreen;
 
         FragColor = vec4(finalColor, globalAlpha);
         return;

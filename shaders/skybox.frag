@@ -53,7 +53,13 @@ float stars(vec3 p) {
 void main() {
     // Check if textured skybox is enabled (future support)
     if (useTexture) {
-        FragColor = texture(skyboxTex, TexCoords);
+        vec3 dir = normalize(TexCoords);
+        vec3 starColor = texture(skyboxTex, TexCoords).rgb * 1.3;
+        float vertical = dir.y * 0.5 + 0.5;
+        float galactic = pow(1.0 - abs(dir.y), 2.2);
+        vec3 nebulaTint = mix(vec3(0.003, 0.006, 0.018), vec3(0.014, 0.006, 0.025), vertical);
+        nebulaTint += vec3(0.010, 0.006, 0.024) * galactic * 0.35;
+        FragColor = vec4(starColor + nebulaTint, 1.0);
         return;
     }
 
@@ -73,9 +79,14 @@ void main() {
     vec3 nebulaBlue = vec3(0.01, 0.03, 0.12);     // Very faint cosmic blue dust
     vec3 nebulaPurple = vec3(0.06, 0.02, 0.08);   // Very faint cosmic purple dust
     vec3 nebulaTeal = vec3(0.005, 0.04, 0.03);    // Very faint cosmic teal dust
+    float vertical = dir.y * 0.5 + 0.5;
+    float galactic = pow(1.0 - abs(dir.y), 2.2);
+    vec3 ambientTint = mix(vec3(0.002, 0.004, 0.014), vec3(0.010, 0.004, 0.020), vertical);
 
     // Accumulate colors
     vec3 finalColor = spaceBg;
+    finalColor += ambientTint * 0.35;
+    finalColor += vec3(0.010, 0.006, 0.024) * galactic * 0.12;
     finalColor += nebulaBlue * pow(n1, 2.5) * 0.6;
     finalColor += nebulaPurple * pow(n2, 2.8) * 0.5;
     finalColor += nebulaTeal * pow(n3, 3.0) * 0.35;
@@ -84,7 +95,7 @@ void main() {
     float n_star = noise(dir * 300.0);
     float s = pow(max(n_star - 0.85, 0.0) * 6.6, 12.0) * 0.08; // extremely faint and small
 
-    finalColor += vec3(s);
+    finalColor += vec3(s) * 1.3;
 
     FragColor = vec4(finalColor, 1.0);
 }

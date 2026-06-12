@@ -141,6 +141,4 @@ public:
     void render(Renderer&) override {}
 private:
     std::shared_ptr<Spacecraft> m_targetSpacecraft;
-    float m_followDistance;
-    float m_followHeight;
 };

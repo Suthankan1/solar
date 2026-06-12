@@ -18,11 +18,13 @@ uniform bool useLighting;
 uniform float lightConstant;
 uniform float lightLinear;
 uniform float lightQuadratic;
+uniform float ambientStrength = 0.015;
 
 uniform vec3 colorOverride;
 uniform bool useColorOverride;
 uniform float emissiveStrength;
 uniform float globalAlpha = 1.0;
+uniform float backLightFactor = 0.0;
 
 uniform float time;
 uniform bool isStarfield = false;
@@ -131,6 +133,32 @@ void main() {
         return;
     }
 
+    if (planetId == 0) {
+        vec2 animUV = TexCoords;
+        animUV.x += 0.008 * sin(TexCoords.y * 15.0 + time * 0.8);
+        animUV.y += 0.005 * sin(TexCoords.x * 20.0 + time * 1.2);
+
+        vec3 sunColor;
+        if (useTexture) {
+            sunColor = texture(planetTexture, animUV).rgb;
+        } else {
+            vec3 p = LocalPos * 3.5;
+            float n1 = fbm(p + vec3(0.0, 0.0, time * 0.25));
+            float n2 = fbm(p * 2.0 - vec3(0.0, time * 0.4, 0.0));
+            float plasma = (n1 + n2) * 0.5;
+            sunColor = mix(vec3(0.75, 0.12, 0.0), vec3(1.0, 0.52, 0.04), plasma);
+            sunColor = mix(sunColor, vec3(1.0, 0.92, 0.45), pow(plasma, 2.5));
+        }
+
+        float wave = 0.5 + 0.5 * sin(time * 0.5 + TexCoords.x * 10.0);
+        float turbulence = 0.5 + 0.5 * sin((TexCoords.x + TexCoords.y) * 36.0 + time * 1.6);
+        sunColor = mix(sunColor, vec3(1.0, 0.8, 0.3), 0.3 * wave);
+        sunColor *= vec3(1.2, 1.0, 0.7) * (0.92 + 0.18 * turbulence);
+
+        FragColor = vec4(sunColor * 2.5, globalAlpha);
+        return;
+    }
+
     if (planetId == 100) {
         // SunHalo: Radial fade using TexCoords.y (0.0 is inner, 1.0 is outer)
         float alpha = 1.0 - TexCoords.y;
@@ -141,6 +169,17 @@ void main() {
         vec3 finalGlow = glowColor * (1.0 + activeEmissive);
         
         FragColor = vec4(finalGlow, alpha * globalAlpha);
+        return;
+    }
+
+    if (planetId == 101) {
+        vec2 flareCoord = TexCoords - vec2(0.5);
+        float dist = length(flareCoord);
+        float core = smoothstep(0.5, 0.0, dist);
+        float ray = smoothstep(0.14, 0.0, abs(flareCoord.y)) * smoothstep(0.5, 0.0, abs(flareCoord.x));
+        float alpha = (pow(core, 3.0) + ray * 0.35) * globalAlpha;
+        vec3 flareColor = useColorOverride ? colorOverride : vec3(1.0, 0.78, 0.28);
+        FragColor = vec4(flareColor * (1.6 + core * 2.8), alpha);
         return;
     }
 
@@ -206,9 +245,7 @@ void main() {
 
     if (useTexture) {
         baseColor = texture(planetTexture, TexCoords).rgb;
-        if (planetId == 0) {
-            activeEmissive = 0.6;
-        } else if (planetId == 3) {
+        if (planetId == 3) {
             // Earth: shine on oceans, matte on land
             if (baseColor.b > baseColor.r * 1.2 && baseColor.b > baseColor.g * 1.1) {
                 specularVal = 1.5; // Stronger specular reflection for Earth oceans
@@ -440,8 +477,6 @@ void main() {
         return;
     }
 
-    // Ambient component (lowered to 0.04 for realistic shadow visibility)
-    float ambientStrength = 0.04;
     vec3 ambient = ambientStrength * lightColor;
 
     // Distance attenuation from the Sun
@@ -481,5 +516,14 @@ void main() {
     // Final color output: ambient remains constant, while diffuse, specular and rim scatter are attenuated
     vec3 result = (ambient + attenuation * (diffuse + specular)) * baseColor;
     result += attenuation * rimStrength * lightColor * baseColor * 0.5;
-    FragColor = vec4(result, globalAlpha * pointSpriteAlpha);
+
+    float finalAlpha = globalAlpha * pointSpriteAlpha;
+    if (planetId == 106) {
+        float shadowSide = 1.0 - smoothstep(-0.05, 0.05, dot(norm, lightDir));
+        result *= mix(1.0, 0.5, shadowSide);
+        finalAlpha *= mix(1.0, 0.85, shadowSide);
+        result += backLightFactor * vec3(0.9, 0.85, 0.7) * 0.4;
+    }
+
+    FragColor = vec4(result, finalAlpha);
 }

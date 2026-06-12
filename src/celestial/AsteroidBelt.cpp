@@ -10,7 +10,8 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 AsteroidBelt::AsteroidBelt(const std::string& name, float innerRadius, float outerRadius, unsigned int count)
-    : SceneObject(name), m_count(count) {
+    : SceneObject(name), m_count(kAsteroidCount) {
+    (void)count;
     
     // 1. Compile the custom instanced asteroid shader using existing cube.frag
     try {
@@ -72,71 +73,86 @@ AsteroidBelt::AsteroidBelt(const std::string& name, float innerRadius, float out
 
     // 4. Distribute the asteroids with realistic variations
     m_asteroids.reserve(m_count);
+    m_speedMultipliers.reserve(m_count);
+    m_angles.reserve(m_count);
     const float PI = 3.14159265359f;
+    const float heroRadii[] = {5.8f, 6.1f, 6.4f};
+    const float heroInitialAngles[] = {0.35f * PI, 1.15f * PI, 1.75f * PI};
+
+    auto rand01 = []() {
+        return static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX);
+    };
+
+    m_heroMesh = std::make_unique<Mesh>(Renderer::createSphere(0.04f, 8, 8));
+    m_heroPositions.reserve(3);
+    m_heroAngles.reserve(3);
+    for (int i = 0; i < 3; ++i) {
+        m_heroAngles.push_back(heroInitialAngles[i]);
+        m_heroPositions.emplace_back(
+            std::cos(heroInitialAngles[i]) * heroRadii[i],
+            0.0f,
+            std::sin(heroInitialAngles[i]) * heroRadii[i]
+        );
+    }
 
     for (unsigned int i = 0; i < m_count; ++i) {
         Asteroid a;
 
         // Radial distribution
-        float r_rand = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX);
+        float r_rand = rand01();
         a.radius = innerRadius + r_rand * (outerRadius - innerRadius);
 
         // Keplerian orbital speed (slower outer orbit, v proportional to 1/sqrt(r))
         // Mars orbit speed in main.cpp is 0.7 at radius 5.0
         float baseSpeed = 0.7f * std::sqrt(5.0f / a.radius);
-        float speedVar = 0.9f + 0.2f * (static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX));
-        a.orbitSpeed = baseSpeed * speedVar;
+        a.orbitSpeed = baseSpeed;
+        m_speedMultipliers.push_back(0.85f + rand01() * 0.30f);
 
         // Random initial orbit angle
-        float angle_rand = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX);
-        a.orbitAngle = angle_rand * 2.0f * PI;
-
-        // Vertical thickness using a triangular distribution (sum of 2 random variables)
-        // This clusters the majority of asteroids near the orbital plane (y = 0)
-        float randSum = (static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX)) +
-                        (static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX)) - 1.0f;
-        a.yOffset = randSum * 0.45f;
+        a.orbitAngle = rand01() * 2.0f * PI;
+        m_angles.push_back(a.orbitAngle);
 
         // Individual self-rotation parameters
-        a.rotationAngle = (static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX)) * 2.0f * PI;
-        a.rotationSpeed = 0.3f + (static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX)) * 1.5f;
+        a.rotationAngle = rand01() * 2.0f * PI;
+        a.rotationSpeed = 0.3f + rand01() * 1.5f;
 
-        float rx = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX) - 0.5f;
-        float ry = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX) - 0.5f;
-        float rz = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX) - 0.5f;
+        float rx = rand01() - 0.5f;
+        float ry = rand01() - 0.5f;
+        float rz = rand01() - 0.5f;
         a.rotationAxis = glm::normalize(glm::vec3(rx, ry, rz));
 
-        // Sizes: 98% small asteroids, 2% larger asteroids
-        float sizeChance = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX);
-        float baseScale = 0.0f;
-        if (sizeChance < 0.02f) {
-            // Larger asteroids
-            baseScale = 0.12f + (static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX)) * 0.08f;
+        // Size tiers: 600 tiny, 160 medium, 40 large.
+        float pointSize = 0.0f;
+        float verticalSpread = 0.0f;
+        if (i < kTinyAsteroidCount) {
+            pointSize = 1.0f + rand01() * 0.8f;
+            verticalSpread = 0.40f;
+        } else if (i < kTinyAsteroidCount + kMediumAsteroidCount) {
+            pointSize = 2.5f + rand01() * 1.5f;
+            verticalSpread = 0.25f;
         } else {
-            // Standard small asteroids
-            baseScale = 0.02f + (static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX)) * 0.04f;
+            pointSize = 5.0f + rand01() * 3.0f;
+            verticalSpread = 0.15f;
         }
+        a.yOffset = (rand01() - 0.5f) * verticalSpread;
+
+        // Convert the requested point-size tiers into instanced mesh scale.
+        float baseScale = pointSize * 0.015f;
 
         // Apply non-uniform scaling on X, Y, Z for irregular rocky dimensions
-        float sx = baseScale * (0.8f + (static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX)) * 0.4f);
-        float sy = baseScale * (0.8f + (static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX)) * 0.4f);
-        float sz = baseScale * (0.8f + (static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX)) * 0.4f);
+        float sx = baseScale * (0.8f + rand01() * 0.4f);
+        float sy = baseScale * (0.8f + rand01() * 0.4f);
+        float sz = baseScale * (0.8f + rand01() * 0.4f);
         a.scale = glm::vec3(sx, sy, sz);
 
-        // Gray and Brown color variation
-        float colorType = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX);
-        if (colorType < 0.4f) {
-            // Carbonaceous gray asteroids
-            float gray = 0.28f + (static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX)) * 0.12f;
-            a.color = glm::vec3(gray, gray * 0.98f, gray * 0.95f);
-        } else if (colorType < 0.8f) {
-            // Silicate brownish-gray asteroids
-            float c = 0.25f + (static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX)) * 0.15f;
-            a.color = glm::vec3(c * 1.15f, c * 0.98f, c * 0.82f);
+        // Warm gray, dark gray, and reddish color mix.
+        float colorType = rand01();
+        if (colorType < 0.60f) {
+            a.color = glm::vec3(0.65f, 0.60f, 0.55f);
+        } else if (colorType < 0.90f) {
+            a.color = glm::vec3(0.40f, 0.37f, 0.33f);
         } else {
-            // Metallic/reddish-brown asteroids
-            float c = 0.22f + (static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX)) * 0.10f;
-            a.color = glm::vec3(c * 1.25f, c * 0.88f, c * 0.72f);
+            a.color = glm::vec3(0.55f, 0.42f, 0.35f);
         }
 
         // Assign to one of the 5 base meshes randomly
@@ -279,9 +295,12 @@ void AsteroidBelt::update(float deltaTime) {
     }
 
     // Update individual physics states and build model matrices
-    for (auto& asteroid : m_asteroids) {
+    for (size_t i = 0; i < m_asteroids.size(); ++i) {
+        auto& asteroid = m_asteroids[i];
+
         // Orbit revolution
-        asteroid.orbitAngle += asteroid.orbitSpeed * deltaTime;
+        m_angles[i] += asteroid.orbitSpeed * m_speedMultipliers[i] * deltaTime;
+        asteroid.orbitAngle = m_angles[i];
         
         // Self-rotation
         asteroid.rotationAngle += asteroid.rotationSpeed * deltaTime;
@@ -299,6 +318,17 @@ void AsteroidBelt::update(float deltaTime) {
         data.color = asteroid.color;
 
         m_instanceDataPerMesh[asteroid.meshIndex].push_back(data);
+    }
+
+    const float heroRadii[] = {5.8f, 6.1f, 6.4f};
+    for (size_t i = 0; i < m_heroPositions.size(); ++i) {
+        const float heroSpeed = 0.7f * std::sqrt(5.0f / heroRadii[i]) * 0.6f;
+        m_heroAngles[i] += heroSpeed * deltaTime;
+        m_heroPositions[i] = glm::vec3(
+            std::cos(m_heroAngles[i]) * heroRadii[i],
+            0.0f,
+            std::sin(m_heroAngles[i]) * heroRadii[i]
+        );
     }
 
     // Upload the updated matrices and colors to GPU VBOs
@@ -334,8 +364,11 @@ void AsteroidBelt::render(Renderer& renderer) {
     // Ensure base instanced colors from vertex inputs are preferred, not overriden
     shader.setBool("useColorOverride", false);
     shader.setFloat("globalAlpha", 1.0f);
+    shader.setBool("useTexture", false);
     shader.setFloat("time", (float)glfwGetTime());
     shader.setInt("planetId", -1);
+    shader.setFloat("pointSizeScale", 1.0f);
+    shader.setBool("isAsteroidPointSprite", false);
 
     // 3. Render all meshes using instanced draw calls
     for (size_t i = 0; i < m_baseMeshes.size(); ++i) {
@@ -343,6 +376,7 @@ void AsteroidBelt::render(Renderer& renderer) {
         if (data.empty()) continue;
 
         glBindVertexArray(m_baseMeshes[i].VAO);
+        shader.setBool("isAsteroidPointSprite", m_baseMeshes[i].drawMode == GL_POINTS);
         glDrawElementsInstanced(
             m_baseMeshes[i].drawMode,
             static_cast<GLsizei>(m_baseMeshes[i].indices.size()),
@@ -352,4 +386,22 @@ void AsteroidBelt::render(Renderer& renderer) {
         );
     }
     glBindVertexArray(0);
+
+    if (m_heroMesh) {
+        shader.setBool("useColorOverride", true);
+        shader.setVec3("colorOverride", glm::vec3(0.50f, 0.46f, 0.40f));
+        shader.setBool("isAsteroidPointSprite", false);
+
+        for (size_t i = 0; i < m_heroPositions.size(); ++i) {
+            glm::mat4 heroModel = m_transform.getModelMatrix();
+            heroModel = glm::translate(heroModel, m_heroPositions[i]);
+            renderer.renderWithLighting(*m_heroMesh, shader, heroModel);
+        }
+    }
+
+    shader.setBool("useColorOverride", false);
+    shader.setFloat("globalAlpha", 1.0f);
+    shader.setBool("useTexture", false);
+    shader.setInt("planetId", -1);
+    shader.setBool("isAsteroidPointSprite", false);
 }

@@ -42,11 +42,15 @@ private:
 
     float m_orbitAngle;
     float m_time = 0.0f;
+    glm::vec3 m_lastPos = glm::vec3(0.0f);
+    glm::vec3 m_velocity = glm::vec3(0.0f, 0.0f, 1.0f);
+    float m_sunTrackAngle = 0.0f;
     Transform m_transform;
 
     // Shared primitive shapes to assemble the station
     std::unique_ptr<Mesh> m_cubeMesh;
     std::unique_ptr<Mesh> m_cylinderMesh;
+    std::unique_ptr<Mesh> m_lightMesh;
 
     // Helper functions to generate unit-scale primitive meshes
     static Mesh createUnitCube();

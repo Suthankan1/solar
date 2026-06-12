@@ -8,12 +8,9 @@
 Moon::Moon(const std::string& name, float radius, float orbitRadius, float orbitSpeed, float rotationSpeed, const glm::vec3& color, std::shared_ptr<Planet> parentPlanet, const std::string& texturePath)
     : SceneObject(name), m_orbitRadius(orbitRadius), m_orbitSpeed(orbitSpeed),
       m_rotationSpeed(rotationSpeed), m_color(color), m_parentPlanet(parentPlanet),
-      m_orbitAngle(0.0f), m_rotationAngle(0.0f) {
+      m_orbitAngle(0.0f), m_rotationAngle(0.0f), m_worldPosition(0.0f) {
     m_orbitAngle = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX) * 2.0f * 3.1415926f;
     m_transform.setScale(glm::vec3(radius));
-    if (m_parentPlanet) {
-        m_transform.setParent(&m_parentPlanet->getTransform());
-    }
 
     if (!texturePath.empty()) {
         m_texture = std::make_unique<Texture>();
@@ -27,14 +24,13 @@ void Moon::update(float deltaTime) {
     m_orbitAngle += m_orbitSpeed * deltaTime;
     m_rotationAngle += m_rotationSpeed * deltaTime;
 
-    // Relative orbit calculation
-    glm::vec3 relativePos(
-        std::cos(m_orbitAngle) * m_orbitRadius,
-        0.0f,
-        std::sin(m_orbitAngle) * m_orbitRadius
-    );
+    glm::vec3 parentPos = m_parentPlanet ? m_parentPlanet->getPosition() : glm::vec3(0.0f);
+    float x = std::cos(m_orbitAngle) * m_orbitRadius;
+    float z = std::sin(m_orbitAngle) * m_orbitRadius;
+    glm::vec3 worldPos = parentPos + glm::vec3(x, 0.0f, z);
 
-    m_transform.setPosition(relativePos);
+    m_transform.setPosition(worldPos);
+    m_worldPosition = worldPos;
     m_transform.setRotation(glm::vec3(0.0f, m_rotationAngle, 0.0f));
 }
 
@@ -66,7 +62,5 @@ void Moon::render(Renderer& renderer) {
     renderer.renderWithLighting(renderer.getSphereMesh(), shader, model);
 
     shader.setBool("useColorOverride", false);
-    if (hasTexture) {
-        shader.setBool("useTexture", false);
-    }
+    shader.setBool("useTexture", false);
 }

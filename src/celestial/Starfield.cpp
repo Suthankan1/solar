@@ -108,7 +108,21 @@ Starfield::Starfield(const std::string& name, unsigned int count, float radius)
 }
 
 void Starfield::render(Renderer& renderer) {
-    if (!m_mesh) return;
+    const Shader& shader = renderer.getShader();
+    shader.use();
+
+    auto resetShaderState = [&shader]() {
+        shader.setBool("useColorOverride", false);
+        shader.setFloat("globalAlpha", 1.0f);
+        shader.setBool("useTexture", false);
+        shader.setInt("planetId", -1);
+        shader.setBool("isStarfield", false);
+    };
+
+    if (!m_mesh) {
+        resetShaderState();
+        return;
+    }
 
     // Apply slow parallax drift by centering the starfield at cameraPos * parallaxFactor
     glm::vec3 cameraPos = renderer.getCameraPosition();
@@ -118,8 +132,6 @@ void Starfield::render(Renderer& renderer) {
     glm::mat4 model = glm::mat4(1.0f);
     model = glm::translate(model, starfieldCenter);
 
-    const Shader& shader = renderer.getShader();
-    shader.use();
     shader.setBool("useColorOverride", false);
     shader.setFloat("time", (float)glfwGetTime());
     shader.setBool("isStarfield", true);
@@ -132,5 +144,5 @@ void Starfield::render(Renderer& renderer) {
     // Re-enable depth write
     glDepthMask(GL_TRUE);
 
-    shader.setBool("isStarfield", false);
+    resetShaderState();
 }

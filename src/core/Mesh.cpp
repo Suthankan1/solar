@@ -88,10 +88,17 @@ void Mesh::draw() const {
 }
 
 void Mesh::updateVertices(const std::vector<Vertex>& newVertices) {
+    const bool sameSize = newVertices.size() == vertices.size();
     this->vertices = newVertices;
-    if (VBO != 0) {
-        glBindBuffer(GL_ARRAY_BUFFER, VBO);
-        glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(Vertex), &vertices[0], GL_STATIC_DRAW);
+    if (VBO == 0 || vertices.empty()) {
+        return;
+    }
+
+    glBindBuffer(GL_ARRAY_BUFFER, VBO);
+    if (sameSize) {
+        glBufferSubData(GL_ARRAY_BUFFER, 0, vertices.size() * sizeof(Vertex), vertices.data());
+    } else {
+        glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(Vertex), vertices.data(), GL_DYNAMIC_DRAW);
     }
 }
 

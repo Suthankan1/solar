@@ -10,7 +10,7 @@ class Planet;
 
 /**
  * @class Moon
- * @brief Represents a natural satellite that transforms relative to its parent planet using the Transform hierarchy.
+ * @brief Represents a natural satellite orbiting a parent planet in world space.
  */
 class Moon : public SceneObject {
 public:
@@ -20,7 +20,7 @@ public:
     void update(float deltaTime) override;
     void render(Renderer& renderer) override;
 
-    glm::vec3 getPosition() const { return glm::vec3(m_transform.getModelMatrix()[3]); }
+    glm::vec3 getPosition() const { return m_worldPosition; }
     float getRadius() const { return m_transform.getScale().x; }
     float getOrbitRadius() const { return m_orbitRadius; }
 
@@ -36,6 +36,7 @@ private:
 
     float m_orbitAngle;
     float m_rotationAngle;
+    glm::vec3 m_worldPosition;
     Transform m_transform;
     std::unique_ptr<Texture> m_texture;
 };

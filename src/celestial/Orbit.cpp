@@ -42,20 +42,35 @@ void Orbit::update(float deltaTime) {
 }
 
 void Orbit::render(Renderer& renderer) {
-    if (!m_mesh) return;
+    const Shader& shader = renderer.getShader();
+    shader.use();
+
+    auto resetShaderState = [&shader]() {
+        shader.setBool("useColorOverride", false);
+        shader.setFloat("globalAlpha", 1.0f);
+        shader.setBool("useTexture", false);
+        shader.setInt("planetId", -1);
+    };
+
+    if (!m_mesh) {
+        resetShaderState();
+        return;
+    }
 
     glm::mat4 model = glm::mat4(1.0f);
     model = glm::translate(model, m_center);
 
-    const Shader& shader = renderer.getShader();
-    shader.use();
     shader.setBool("useColorOverride", true);
     shader.setVec3("colorOverride", m_color);
-    shader.setFloat("globalAlpha", 0.18f); // Thin, transparent, and subtle
 
     // Orbit lines are drawn unlit
+    shader.setFloat("globalAlpha", 0.06f);
+    glm::mat4 glowModel = glm::scale(model, glm::vec3(1.002f));
+    renderer.render(*m_mesh, shader, glowModel);
+
+    const float orbitAlpha = m_semiMajorAxis >= 7.0f ? 0.12f : 0.15f;
+    shader.setFloat("globalAlpha", orbitAlpha);
     renderer.render(*m_mesh, shader, model);
 
-    shader.setBool("useColorOverride", false);
-    shader.setFloat("globalAlpha", 1.0f);
+    resetShaderState();
 }

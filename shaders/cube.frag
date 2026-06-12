@@ -26,6 +26,7 @@ uniform float globalAlpha = 1.0;
 
 uniform float time;
 uniform bool isStarfield = false;
+uniform bool isAsteroidPointSprite = false;
 uniform int planetId = -1;
 
 uniform sampler2D planetTexture;
@@ -92,6 +93,14 @@ void main() {
     vec3 norm = normalize(Normal);
     float specularVal = 0.5; // Default specular strength
     float activeEmissive = emissiveStrength;
+    float pointSpriteAlpha = 1.0;
+
+    if (isAsteroidPointSprite) {
+        vec2 coord = gl_PointCoord - vec2(0.5);
+        float dist = dot(coord, coord);
+        if (dist > 0.25) discard;
+        pointSpriteAlpha = 1.0 - smoothstep(0.15, 0.25, dist);
+    }
 
     if (planetId == 200) {
         // Space Station custom rim light and shading
@@ -424,9 +433,9 @@ void main() {
             
             FragColor = vec4(finalStarColor, alpha * globalAlpha);
         } else if (activeEmissive > 0.0) {
-            FragColor = vec4(baseColor * (1.0 + activeEmissive), globalAlpha);
+            FragColor = vec4(baseColor * (1.0 + activeEmissive), globalAlpha * pointSpriteAlpha);
         } else {
-            FragColor = vec4(baseColor, globalAlpha);
+            FragColor = vec4(baseColor, globalAlpha * pointSpriteAlpha);
         }
         return;
     }
@@ -461,8 +470,16 @@ void main() {
         rimStrength = rim * 0.4;
     }
 
+    if (useTexture) {
+        vec3 texColor = texture(planetTexture, TexCoords).rgb;
+        vec3 textureAmbient = 0.03 * lightColor;
+        vec3 textureDiffuse = diff * lightColor;
+        FragColor = vec4((textureAmbient + textureDiffuse) * texColor, globalAlpha * pointSpriteAlpha);
+        return;
+    }
+
     // Final color output: ambient remains constant, while diffuse, specular and rim scatter are attenuated
     vec3 result = (ambient + attenuation * (diffuse + specular)) * baseColor;
     result += attenuation * rimStrength * lightColor * baseColor * 0.5;
-    FragColor = vec4(result, globalAlpha);
+    FragColor = vec4(result, globalAlpha * pointSpriteAlpha);
 }

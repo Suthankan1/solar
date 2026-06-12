@@ -119,36 +119,37 @@ int main() {
         auto sun = std::make_shared<Sun>("Sun", 1.2f, glm::vec3(1.0f, 0.65f, 0.0f), glm::vec3(1.0f, 0.95f, 0.8f), "textures/sun.jpg");
         auto sunHalo = std::make_shared<SunHalo>("SunHalo", 1.3f, 2.8f);
         // Create Planets (name, radius, semiMajorAxis, semiMinorAxis, inclination, orbitSpeed, rotationSpeed, color, texturePath, orbitPhaseOffset, longitudeOfAscendingNode)
-        auto mercury = std::make_shared<Planet>("Mercury", 0.08f, 2.0f, 1.75f, 7.0f, 1.6f, 3.0f, glm::vec3(0.76f, 0.70f, 0.65f), "textures/mercury.jpg", 0.5f, 48.3f);
-        auto venus = std::make_shared<Planet>("Venus", 0.15f, 2.8f, 2.795f, 3.4f, 1.1f, 0.4f, glm::vec3(0.95f, 0.85f, 0.55f), "textures/venus.jpg", 1.2f, 76.7f);
-        auto earth = std::make_shared<Planet>("Earth", 0.18f, 3.8f, 3.76f, 0.0f, 0.9f, 1.8f, glm::vec3(0.25f, 0.55f, 0.95f), "textures/earth.jpg", 0.0f, 0.0f);
-        auto mars = std::make_shared<Planet>("Mars", 0.12f, 5.0f, 4.75f, 1.85f, 0.7f, 1.7f, glm::vec3(0.80f, 0.35f, 0.20f), "textures/mars.jpg", 2.4f, 49.6f);
+        auto mercury = std::make_shared<Planet>("Mercury", 0.20f, 2.0f, 1.75f, 7.0f, 1.6f, 3.0f, glm::vec3(0.76f, 0.70f, 0.65f), "textures/mercury.jpg", 0.5f, 48.3f);
+        auto venus = std::make_shared<Planet>("Venus", 0.32f, 2.8f, 2.795f, 3.4f, 1.1f, 0.4f, glm::vec3(0.95f, 0.85f, 0.55f), "textures/venus.jpg", 1.2f, 76.7f);
+        auto earth = std::make_shared<Planet>("Earth", 0.38f, 3.8f, 3.76f, 0.0f, 0.9f, 1.8f, glm::vec3(0.25f, 0.55f, 0.95f), "textures/earth.jpg", 0.0f, 0.0f);
+        auto mars = std::make_shared<Planet>("Mars", 0.28f, 5.0f, 4.75f, 1.85f, 0.7f, 1.7f, glm::vec3(0.80f, 0.35f, 0.20f), "textures/mars.jpg", 2.4f, 49.6f);
         auto asteroidBelt = std::make_shared<AsteroidBelt>("AsteroidBelt", 5.6f, 6.4f, 2000);
-        auto jupiter = std::make_shared<Planet>("Jupiter", 0.42f, 7.0f, 6.85f, 1.3f, 0.4f, 2.5f, glm::vec3(0.85f, 0.72f, 0.58f), "textures/jupiter.jpg", 3.8f, 100.5f);
-        auto saturn = std::make_shared<Planet>("Saturn", 0.36f, 9.5f, 9.3f, 2.48f, 0.3f, 2.2f, glm::vec3(0.92f, 0.86f, 0.65f), "textures/saturn.jpg", 4.5f, 113.7f);
+        auto jupiter = std::make_shared<Planet>("Jupiter", 0.90f, 7.0f, 6.85f, 1.3f, 0.4f, 2.5f, glm::vec3(0.85f, 0.72f, 0.58f), "textures/jupiter.jpg", 3.8f, 100.5f);
+        auto saturn = std::make_shared<Planet>("Saturn", 0.78f, 9.5f, 9.3f, 2.48f, 0.3f, 2.2f, glm::vec3(0.92f, 0.86f, 0.65f), "textures/saturn.jpg", 4.5f, 113.7f);
         auto saturnRings = std::make_shared<SaturnRings>("SaturnRings", saturn);
-        auto uranus = std::make_shared<Planet>("Uranus", 0.25f, 11.5f, 11.3f, 0.77f, 0.2f, 1.4f, glm::vec3(0.55f, 0.85f, 0.90f), "textures/uranus.jpg", 5.1f, 74.0f);
-        auto neptune = std::make_shared<Planet>("Neptune", 0.23f, 13.5f, 13.3f, 1.77f, 0.15f, 1.5f, glm::vec3(0.25f, 0.40f, 0.95f), "textures/neptune.jpg", 1.8f, 131.8f);
+        auto uranus = std::make_shared<Planet>("Uranus", 0.55f, 11.5f, 11.3f, 0.77f, 0.2f, 1.4f, glm::vec3(0.55f, 0.85f, 0.90f), "textures/uranus.jpg", 5.1f, 74.0f);
+        auto neptune = std::make_shared<Planet>("Neptune", 0.50f, 13.5f, 13.3f, 1.77f, 0.15f, 1.5f, glm::vec3(0.25f, 0.40f, 0.95f), "textures/neptune.jpg", 1.8f, 131.8f);
 
         // Create Orbit Rings (name + "Orbit", planet, color, parent)
         auto mercuryOrbit = std::make_shared<Orbit>("MercuryOrbit", mercury, glm::vec3(0.4f, 0.38f, 0.36f), nullptr);
         auto venusOrbit = std::make_shared<Orbit>("VenusOrbit", venus, glm::vec3(0.5f, 0.45f, 0.30f), nullptr);
-        auto earthOrbit = std::make_shared<Orbit>("EarthOrbit", earth, glm::vec3(0.15f, 0.30f, 0.55f), nullptr);
-        auto marsOrbit = std::make_shared<Orbit>("MarsOrbit", mars, glm::vec3(0.45f, 0.20f, 0.12f), nullptr);
+        auto earthOrbit = std::make_shared<Orbit>("EarthOrbit", earth, glm::vec3(0.2f, 0.5f, 0.9f), nullptr);
+        auto marsOrbit = std::make_shared<Orbit>("MarsOrbit", mars, glm::vec3(0.7f, 0.25f, 0.1f), nullptr);
         auto jupiterOrbit = std::make_shared<Orbit>("JupiterOrbit", jupiter, glm::vec3(0.45f, 0.38f, 0.30f), nullptr);
         auto saturnOrbit = std::make_shared<Orbit>("SaturnOrbit", saturn, glm::vec3(0.48f, 0.44f, 0.33f), nullptr);
         auto uranusOrbit = std::make_shared<Orbit>("UranusOrbit", uranus, glm::vec3(0.28f, 0.42f, 0.46f), nullptr);
         auto neptuneOrbit = std::make_shared<Orbit>("NeptuneOrbit", neptune, glm::vec3(0.12f, 0.20f, 0.48f), nullptr);
+        auto moonOrbit = std::make_shared<Orbit>("MoonOrbit", 0.65f, glm::vec3(0.25f, 0.28f, 0.38f), earth);
 
         // Create Moons (name, radius, orbitRadius, orbitSpeed, rotationSpeed, color, parentPlanet)
-        auto moon = std::make_shared<Moon>("Moon", 0.06f, 0.38f, 2.5f, 1.2f, glm::vec3(0.75f, 0.75f, 0.72f), earth, "textures/moon.jpg");
-        auto phobos = std::make_shared<Moon>("Phobos", 0.035f, 0.22f, 4.0f, 2.0f, glm::vec3(0.60f, 0.55f, 0.48f), mars);
-        auto io = std::make_shared<Moon>("Io", 0.07f, 0.65f, 3.5f, 1.0f, glm::vec3(0.95f, 0.88f, 0.45f), jupiter);
-        auto europa = std::make_shared<Moon>("Europa", 0.055f, 0.85f, 2.8f, 1.2f, glm::vec3(0.80f, 0.75f, 0.70f), jupiter);
+        auto moon = std::make_shared<Moon>("Moon", 0.13f, 0.65f, 2.5f, 1.2f, glm::vec3(0.75f, 0.75f, 0.72f), earth, "textures/moon.jpg");
+        auto phobos = std::make_shared<Moon>("Phobos", 0.07f, 0.40f, 5.0f, 2.0f, glm::vec3(0.60f, 0.55f, 0.48f), mars);
+        auto io = std::make_shared<Moon>("Io", 0.15f, 1.1f, 3.0f, 1.0f, glm::vec3(0.95f, 0.88f, 0.45f), jupiter);
+        auto europa = std::make_shared<Moon>("Europa", 0.12f, 1.45f, 2.2f, 1.2f, glm::vec3(0.80f, 0.75f, 0.70f), jupiter);
 
         // Create Space Station and its Orbit orbiting Earth
-        auto spaceStation = std::make_shared<SpaceStation>("SpaceStation", 0.28f, 2.2f, earth);
-        auto spaceStationOrbit = std::make_shared<Orbit>("SpaceStationOrbit", 0.28f, glm::vec3(0.2f, 0.35f, 0.45f), earth);
+        auto spaceStation = std::make_shared<SpaceStation>("SpaceStation", 0.52f, 2.2f, earth);
+        auto spaceStationOrbit = std::make_shared<Orbit>("SpaceStationOrbit", 0.52f, 0.52f, 51.6f, 0.0f, glm::vec3(0.2f, 0.35f, 0.45f), earth);
 
         // Create Spacecraft
         auto spacecraft = std::make_shared<Spacecraft>("Spacecraft", earth, mars);
@@ -160,6 +161,7 @@ int main() {
         sceneManager.registerObject(mercuryOrbit);
         sceneManager.registerObject(venusOrbit);
         sceneManager.registerObject(earthOrbit);
+        sceneManager.registerObject(moonOrbit);
         sceneManager.registerObject(spaceStationOrbit);
         sceneManager.registerObject(marsOrbit);
         sceneManager.registerObject(jupiterOrbit);
@@ -330,7 +332,7 @@ int main() {
                 "Earth & Moon System",
                 "Observing the Earth and its tidally locked natural satellite, illustrating scaling and relative orbital orbits.",
                 "Relative Transformations & Dynamic Night Lights", "Earth", 1.0f,
-                glm::vec3(1.4f, 0.5f, -1.2f), glm::vec3(1.1f, 0.35f, -0.7f), glm::vec3(-0.75f, 0.20f, 0.85f), glm::vec3(-1.0f, 0.10f, 1.3f),
+                glm::vec3(1.8f, 0.7f, -1.5f), glm::vec3(1.2f, 0.4f, -0.8f), glm::vec3(-0.8f, 0.25f, 0.9f), glm::vec3(-1.2f, 0.15f, 1.5f),
                 glm::vec3(0.0f), glm::vec3(0.0f), glm::vec3(0.0f), glm::vec3(0.0f)
             },
             // 8. Space Station Orbit (80-100s)
@@ -339,8 +341,8 @@ int main() {
                 "International Space Station",
                 "A modular research laboratory in low Earth orbit, assembled using hierarchical truss lines and solar panels.",
                 "Hierarchical Model Assemblies & Local Euler Rotations", "SpaceStation", 2.2f,
-                glm::vec3(0.12f, 0.04f, 0.15f), glm::vec3(0.08f, 0.02f, 0.08f), glm::vec3(-0.06f, -0.015f, -0.04f), glm::vec3(-0.10f, -0.03f, -0.08f),
-                glm::vec3(0.0f, -0.005f, 0.01f), glm::vec3(0.008f, -0.005f, 0.012f), glm::vec3(0.0f, -0.005f, 0.01f), glm::vec3(0.0f, -0.005f, 0.01f)
+                glm::vec3(0.25f, 0.08f, 0.0f), glm::vec3(0.0f, 0.15f, 0.25f), glm::vec3(-0.25f, 0.08f, 0.0f), glm::vec3(0.0f, 0.04f, -0.28f),
+                glm::vec3(0.0f), glm::vec3(0.0f), glm::vec3(0.0f), glm::vec3(0.0f)
             },
             // 9. Spacecraft Mission (100-125s)
             {
@@ -356,9 +358,9 @@ int main() {
                 DemoStage::ASTEROID_BELT, "Asteroid Belt Navigation", 125.0f, 20.0f,
                 "The Asteroid Belt",
                 "Navigating through the annular debris belt situated between the orbits of Mars and Jupiter.",
-                "Dynamic Instanced Particle Simulation & GL_POINTS", "AsteroidBelt", 1.2f,
-                glm::vec3(6.5f, 1.2f, -1.0f), glm::vec3(6.0f, 0.4f, 0.0f), glm::vec3(-5.8f, -0.2f, 2.5f), glm::vec3(-7.0f, -0.6f, 3.5f),
-                glm::vec3(6.0f, 0.4f, 1.0f), glm::vec3(5.0f, 0.3f, 1.5f), glm::vec3(-6.5f, -0.3f, 4.0f), glm::vec3(-8.0f, -0.7f, 5.0f)
+                "Dynamic Instanced Particle Simulation & GL_POINTS; GL_POINTS instanced simulation, 800 varied particles, 3 size tiers", "AsteroidBelt", 1.5f,
+                glm::vec3(5.0f, 0.8f, -0.5f), glm::vec3(5.5f, 0.3f, 1.0f), glm::vec3(6.5f, -0.2f, 2.5f), glm::vec3(7.2f, -0.5f, 3.5f),
+                glm::vec3(0.0f), glm::vec3(0.0f), glm::vec3(0.0f), glm::vec3(0.0f)
             },
             // 11. Jupiter View (145-155s)
             {

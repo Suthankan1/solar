@@ -5,7 +5,15 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
-Renderer::Renderer() : m_shader(nullptr), m_earthShader(nullptr), m_sphereMesh(nullptr) {}
+Renderer::Renderer()
+    : m_shader(nullptr),
+      m_earthShader(nullptr),
+      m_sphereMesh(nullptr),
+      m_lightPosition(0.0f),
+      m_lightColor(1.5f, 1.4f, 1.2f),
+      m_lightConstant(1.0f),
+      m_lightLinear(0.014f),
+      m_lightQuadratic(0.0007f) {}
 
 Renderer::~Renderer() {
     cleanup();
@@ -60,12 +68,14 @@ void Renderer::render(const Mesh& mesh, const Shader& shader, const glm::mat4& m
     shader.setMat4("view", view);
     shader.setMat4("projection", projection);
     shader.setBool("useLighting", false);
+    shader.setBool("isAsteroidPointSprite", false);
     shader.setFloat("time", (float)glfwGetTime());
 
     mesh.draw();
 
     shader.setFloat("globalAlpha", 1.0f);
     shader.setInt("planetId", -1);
+    shader.setBool("isAsteroidPointSprite", false);
 }
 
 /*
@@ -81,6 +91,7 @@ void Renderer::renderWithLighting(const Mesh& mesh, const Shader& shader,
     
     // Set lighting parameters
     shader.setBool("useLighting", true);
+    shader.setBool("isAsteroidPointSprite", false);
     shader.setVec3("lightPos", lightPos);
     shader.setVec3("lightColor", lightColor);
     shader.setVec3("viewPos", viewPos);
@@ -93,6 +104,7 @@ void Renderer::renderWithLighting(const Mesh& mesh, const Shader& shader,
 
     shader.setFloat("globalAlpha", 1.0f);
     shader.setInt("planetId", -1);
+    shader.setBool("isAsteroidPointSprite", false);
 }
 
 void Renderer::render(const Mesh& mesh, const Shader& shader, const glm::mat4& model) {

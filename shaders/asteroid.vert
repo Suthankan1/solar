@@ -15,6 +15,7 @@ out vec3 LocalPos;
 uniform mat4 model;
 uniform mat4 view;
 uniform mat4 projection;
+uniform float pointSizeScale = 1.0;
 
 void main() {
     // Combine overall belt orbit/rotation matrix with the individual asteroid's instance matrix
@@ -30,4 +31,5 @@ void main() {
     LocalPos = aPos;
     
     gl_Position = projection * view * vec4(FragPos, 1.0);
+    gl_PointSize = TexCoords.y * pointSizeScale;
 }

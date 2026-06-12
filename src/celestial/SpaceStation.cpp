@@ -2,6 +2,7 @@
 #include "celestial/Planet.h"
 #include "core/Renderer.h"
 #include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/quaternion.hpp>
 #include <cmath>
 #include <cstdlib>
 
@@ -11,6 +12,14 @@ SpaceStation::SpaceStation(const std::string& name, float orbitRadius, float orb
     
     // Spread out the station's start position along the orbit
     m_orbitAngle = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX) * 2.0f * 3.1415926f;
+    m_lastPos = glm::vec3(
+        std::cos(m_orbitAngle) * m_orbitRadius,
+        0.0f,
+        std::sin(m_orbitAngle) * m_orbitRadius
+    );
+    float incRad = glm::radians(51.6f);
+    m_lastPos.y = -m_lastPos.z * std::sin(incRad);
+    m_lastPos.z = m_lastPos.z * std::cos(incRad);
 
     if (m_parentPlanet) {
         m_transform.setParent(&m_parentPlanet->getTransform());
@@ -19,6 +28,7 @@ SpaceStation::SpaceStation(const std::string& name, float orbitRadius, float orb
     // Initialize unit primitives
     m_cubeMesh = std::make_unique<Mesh>(createUnitCube());
     m_cylinderMesh = std::make_unique<Mesh>(createUnitCylinder(16));
+    m_lightMesh = std::make_unique<Mesh>(Renderer::createSphere(0.002f, 6, 6));
 }
 
 void SpaceStation::update(float deltaTime) {
@@ -32,10 +42,38 @@ void SpaceStation::update(float deltaTime) {
         std::sin(m_orbitAngle) * m_orbitRadius
     );
 
+    float incRad = glm::radians(51.6f);
+    float newY = -relativePos.z * std::sin(incRad);
+    float newZ = relativePos.z * std::cos(incRad);
+    relativePos.y = newY;
+    relativePos.z = newZ;
+
     m_transform.setPosition(relativePos);
 
-    // Lock orientation relative to Earth (yaw = -orbitAngle) plus slow roll self-rotation
-    m_transform.setRotation(glm::vec3(0.0f, -m_orbitAngle, m_time * 0.05f));
+    if (m_time > 0.01f) {
+        glm::vec3 deltaPos = relativePos - m_lastPos;
+        if (glm::dot(deltaPos, deltaPos) > 0.000001f) {
+            m_velocity = glm::normalize(deltaPos);
+        }
+    }
+    m_lastPos = relativePos;
+
+    glm::vec3 earthWorldPos(0.0f);
+    if (m_parentPlanet) {
+        earthWorldPos = glm::vec3(m_parentPlanet->getTransform().getModelMatrix()[3]);
+    }
+    glm::vec3 sunDir = -glm::normalize(earthWorldPos + relativePos);
+    m_sunTrackAngle = std::atan2(sunDir.x, sunDir.z);
+
+    glm::vec3 upRef(0.0f, 1.0f, 0.0f);
+    if (std::abs(glm::dot(m_velocity, upRef)) > 0.98f) {
+        upRef = glm::vec3(1.0f, 0.0f, 0.0f);
+    }
+
+    glm::vec3 right = glm::normalize(glm::cross(upRef, m_velocity));
+    glm::vec3 up = glm::normalize(glm::cross(m_velocity, right));
+    glm::quat progradeRotation = glm::quat_cast(glm::mat3(right, up, m_velocity));
+    m_transform.setRotation(glm::eulerAngles(progradeRotation));
 }
 
 glm::vec3 SpaceStation::getCloseUpTargetPoint() const {
@@ -47,17 +85,7 @@ glm::vec3 SpaceStation::getCloseUpTargetPoint() const {
 void SpaceStation::render(Renderer& renderer) {
     if (!m_cubeMesh || !m_cylinderMesh) return;
 
-    // Dynamic Scale Factor: Scale up when camera is close, but keep it small relative to Earth
-    float distanceToCamera = glm::distance(renderer.getCameraPosition(), getPosition());
-    float scaleFactor = 1.0f;
-    if (distanceToCamera < 1.2f) {
-        // Smoothly scale up from 1.0x to 2.4x as the camera gets close
-        float t = glm::clamp((1.2f - distanceToCamera) / 1.0f, 0.0f, 1.0f);
-        scaleFactor = glm::mix(1.0f, 2.4f, t);
-    } else {
-        scaleFactor = 1.0f;
-    }
-
+    float scaleFactor = 2.8f; // Fixed scale: no camera-distance scaling.
     glm::mat4 modelBase = m_transform.getModelMatrix();
     modelBase = glm::scale(modelBase, glm::vec3(scaleFactor));
 
@@ -176,8 +204,8 @@ void SpaceStation::render(Renderer& renderer) {
         // Central structural mast (golden-brown truss line running out along Z)
         renderCylinder(modelBase, glm::vec3(xOffset, 0.0f, 0.0f), glm::vec3(0.0012f, 0.076f, 0.0012f), glm::vec3(1.5708f, 0.0f, 0.0f), goldMetal);
 
-        // Slow panel rotation to track simulated sunlight (rotating around the mast axis)
-        float panelRot = m_time * 0.15f + (isLeft ? 0.0f : 1.57f);
+        // Rotate around the mast axis to track the Sun at the scene origin.
+        float panelRot = m_sunTrackAngle + (isLeft ? 0.0f : 1.57f);
 
         glm::mat4 panelBase = glm::translate(modelBase, glm::vec3(xOffset, 0.0f, 0.0f));
         panelBase = glm::rotate(panelBase, panelRot, glm::vec3(0.0f, 0.0f, 1.0f));
@@ -283,6 +311,21 @@ void SpaceStation::render(Renderer& renderer) {
     // Gold Antenna Dish
     glm::mat4 antDish = glm::rotate(antDishPivot, glm::radians(-60.0f), glm::vec3(1.0f, 0.0f, 0.0f));
     renderCylinder(antDish, glm::vec3(0.0f, 0.0006f, 0.0f), glm::vec3(0.007f, 0.0006f, 0.007f), glm::vec3(0.0f), goldMetal);
+
+    bool blink = (std::fmod(m_time, 2.0f) < 1.0f);
+    if (blink && m_lightMesh) {
+        auto renderLight = [&](const glm::vec3& offset, const glm::vec3& color) {
+            glm::mat4 lm = glm::translate(modelBase, offset);
+            lm = glm::scale(lm, glm::vec3(1.5f));
+            shader.setVec3("colorOverride", color);
+            renderer.renderWithLighting(*m_lightMesh, shader, lm);
+        };
+
+        renderLight(glm::vec3(-0.085f, 0.0f, 0.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+        renderLight(glm::vec3(0.085f, 0.0f, 0.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+        renderLight(glm::vec3(0.0f, 0.0f, 0.040f), glm::vec3(1.0f, 1.0f, 1.0f));
+        renderLight(glm::vec3(0.0f, 0.0f, -0.060f), glm::vec3(1.0f, 0.5f, 0.0f));
+    }
 
     // Restore shader states
     shader.setBool("useColorOverride", false);

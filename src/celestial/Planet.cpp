@@ -53,7 +53,7 @@ void Planet::update(float deltaTime) {
 
     // 2. Inclination (rotate around X-axis by inclination angle)
     float x1 = x0;
-    float y1 = z0 * std::sin(iRad);
+    float y1 = -z0 * std::sin(iRad);
     float z1 = z0 * std::cos(iRad);
 
     // 3. Longitude of ascending node (rotate around Y-axis)
@@ -67,7 +67,18 @@ void Planet::update(float deltaTime) {
 }
 
 void Planet::render(Renderer& renderer) {
+    float tiltDeg = 0.0f;
+    if (m_name == "Earth") tiltDeg = 23.4f;
+    else if (m_name == "Mars") tiltDeg = 25.2f;
+    else if (m_name == "Jupiter") tiltDeg = 3.1f;
+    else if (m_name == "Saturn") tiltDeg = 26.7f;
+    else if (m_name == "Uranus") tiltDeg = 97.8f;
+    else if (m_name == "Neptune") tiltDeg = 28.3f;
+    else if (m_name == "Venus") tiltDeg = 177.4f;
+    else if (m_name == "Mercury") tiltDeg = 0.034f;
+
     glm::mat4 model = m_transform.getModelMatrix();
+    model = glm::rotate(model, glm::radians(tiltDeg), glm::vec3(0.0f, 0.0f, 1.0f));
 
     if (m_name == "Earth" && renderer.getEarthShader() != nullptr) {
         const Shader& shader = *renderer.getEarthShader();

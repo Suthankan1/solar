@@ -40,7 +40,21 @@ SunHalo::SunHalo(const std::string& name, float innerRadius, float outerRadius)
 }
 
 void SunHalo::render(Renderer& renderer) {
-    if (!m_halo) return;
+    const Shader& shader = renderer.getShader();
+    shader.use();
+
+    auto resetShaderState = [&shader]() {
+        shader.setBool("useColorOverride", false);
+        shader.setFloat("globalAlpha", 1.0f);
+        shader.setBool("useTexture", false);
+        shader.setInt("planetId", -1);
+        shader.setFloat("emissiveStrength", 0.0f);
+    };
+
+    if (!m_halo) {
+        resetShaderState();
+        return;
+    }
 
     // Enable additive blending
     glEnable(GL_BLEND);
@@ -49,12 +63,10 @@ void SunHalo::render(Renderer& renderer) {
     // Disable depth write
     glDepthMask(GL_FALSE);
 
-    const Shader& shader = renderer.getShader();
-    shader.use();
-
     // Set useColorOverride=true, colorOverride = glm::vec3(1.0f, 0.55f, 0.05f)
     shader.setBool("useColorOverride", true);
     shader.setVec3("colorOverride", glm::vec3(1.0f, 0.55f, 0.05f));
+    shader.setBool("useTexture", false);
 
     // Set emissiveStrength uniform to 1.2f
     shader.setFloat("emissiveStrength", 1.2f);
@@ -84,7 +96,5 @@ void SunHalo::render(Renderer& renderer) {
     glDisable(GL_BLEND);
 
     // Reset shader states
-    shader.setBool("useColorOverride", false);
-    shader.setFloat("emissiveStrength", 0.0f);
-    shader.setInt("planetId", -1);
+    resetShaderState();
 }

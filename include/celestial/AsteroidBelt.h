@@ -18,6 +18,10 @@ public:
     void render(Renderer& renderer) override;
 
 private:
+    static constexpr unsigned int kAsteroidCount = 800;
+    static constexpr unsigned int kTinyAsteroidCount = 600;
+    static constexpr unsigned int kMediumAsteroidCount = 160;
+
     struct Asteroid {
         float radius;
         float orbitAngle;
@@ -48,5 +52,10 @@ private:
     std::unique_ptr<Shader> m_shader;
     
     std::vector<Asteroid> m_asteroids;
+    std::vector<float> m_speedMultipliers;
+    std::vector<float> m_angles;
     std::vector<std::vector<InstanceData>> m_instanceDataPerMesh;
+    std::vector<glm::vec3> m_heroPositions;
+    std::vector<float> m_heroAngles;
+    std::unique_ptr<Mesh> m_heroMesh;
 };

@@ -1,10 +1,9 @@
 #include "celestial/Spacecraft.h"
 #include "celestial/Planet.h"
 #include "core/Renderer.h"
-#include <glm/gtc/matrix_transform.hpp>
 #include <GLFW/glfw3.h>
+#include <glm/gtc/matrix_transform.hpp>
 #include <cmath>
-#include <cstdlib>
 
 Spacecraft::Spacecraft(const std::string& name, std::shared_ptr<Planet> earth, std::shared_ptr<Planet> mars)
     : SceneObject(name), m_earth(earth), m_mars(mars), m_progress(0.0f), m_rollAngle(0.0f), m_position(0.0f), m_forward(0.0f, 0.0f, 1.0f) {
@@ -158,154 +157,101 @@ void Spacecraft::render(Renderer& renderer) {
     // --- 2. Draw Spacecraft Model Components ---
     glm::mat4 modelBase = m_transform.getModelMatrix();
 
-    // 2a. Main Probe Body:
-    // - Core: Gold-foil insulated cube at center
-    glm::mat4 goldCoreModel = modelBase;
-    goldCoreModel = glm::scale(goldCoreModel, glm::vec3(0.009f, 0.009f, 0.012f));
-    shader.setVec3("colorOverride", glm::vec3(0.85f, 0.65f, 0.15f)); // gold foil
-    renderer.renderWithLighting(*m_cubeMesh, shader, goldCoreModel);
+    auto renderCube = [&](const glm::mat4& parent, const glm::vec3& offset, const glm::vec3& scale,
+                          const glm::vec3& rotation, const glm::vec3& color) {
+        glm::mat4 model = parent;
+        model = glm::translate(model, offset);
+        model = glm::rotate(model, rotation.x, glm::vec3(1.0f, 0.0f, 0.0f));
+        model = glm::rotate(model, rotation.y, glm::vec3(0.0f, 1.0f, 0.0f));
+        model = glm::rotate(model, rotation.z, glm::vec3(0.0f, 0.0f, 1.0f));
+        model = glm::scale(model, scale);
+        shader.setVec3("colorOverride", color);
+        renderer.renderWithLighting(*m_cubeMesh, shader, model);
+    };
 
-    // - Scientific Instrument Ring: Silver cylinder forward of the core, aligned along Z
-    glm::mat4 instrumentRingModel = modelBase;
-    instrumentRingModel = glm::translate(instrumentRingModel, glm::vec3(0.0f, 0.0f, 0.007f));
-    instrumentRingModel = glm::rotate(instrumentRingModel, glm::radians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f)); // rotate local Y to Z
-    instrumentRingModel = glm::scale(instrumentRingModel, glm::vec3(0.007f, 0.003f, 0.007f));
-    shader.setVec3("colorOverride", glm::vec3(0.75f, 0.75f, 0.78f)); // silver/grey metal
-    renderer.renderWithLighting(*m_cylinderMesh, shader, instrumentRingModel);
+    auto renderCylinder = [&](const glm::mat4& parent, const glm::vec3& offset, const glm::vec3& scale,
+                              const glm::vec3& rotation, const glm::vec3& color) {
+        glm::mat4 model = parent;
+        model = glm::translate(model, offset);
+        model = glm::rotate(model, rotation.x, glm::vec3(1.0f, 0.0f, 0.0f));
+        model = glm::rotate(model, rotation.y, glm::vec3(0.0f, 1.0f, 0.0f));
+        model = glm::rotate(model, rotation.z, glm::vec3(0.0f, 0.0f, 1.0f));
+        model = glm::scale(model, scale);
+        shader.setVec3("colorOverride", color);
+        renderer.renderWithLighting(*m_cylinderMesh, shader, model);
+    };
 
-    // 2b. Cockpit / Sensor Head:
-    // - Crew Cockpit Module: White cylinder at the very front
-    glm::mat4 cockpitCabinModel = modelBase;
-    cockpitCabinModel = glm::translate(cockpitCabinModel, glm::vec3(0.0f, 0.0f, 0.0115f));
-    cockpitCabinModel = glm::rotate(cockpitCabinModel, glm::radians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
-    cockpitCabinModel = glm::scale(cockpitCabinModel, glm::vec3(0.0055f, 0.005f, 0.0055f));
-    shader.setVec3("colorOverride", glm::vec3(0.92f, 0.94f, 0.96f)); // clean white
-    renderer.renderWithLighting(*m_cylinderMesh, shader, cockpitCabinModel);
+    auto renderCone = [&](const glm::mat4& parent, const glm::vec3& offset, const glm::vec3& scale,
+                          const glm::vec3& rotation, const glm::vec3& color) {
+        glm::mat4 model = parent;
+        model = glm::translate(model, offset);
+        model = glm::rotate(model, rotation.x, glm::vec3(1.0f, 0.0f, 0.0f));
+        model = glm::rotate(model, rotation.y, glm::vec3(0.0f, 1.0f, 0.0f));
+        model = glm::rotate(model, rotation.z, glm::vec3(0.0f, 0.0f, 1.0f));
+        model = glm::scale(model, scale);
+        shader.setVec3("colorOverride", color);
+        renderer.renderWithLighting(*m_coneMesh, shader, model);
+    };
 
-    // - Visor Window: Cyan-tinted cube on top of the cockpit cabin
-    glm::mat4 windowModel = modelBase;
-    windowModel = glm::translate(windowModel, glm::vec3(0.0f, 0.0022f, 0.0125f)); // offset up and forward
-    windowModel = glm::scale(windowModel, glm::vec3(0.0035f, 0.0018f, 0.0025f));
-    shader.setVec3("colorOverride", glm::vec3(0.02f, 0.55f, 0.78f)); // glossy blue-cyan
-    renderer.renderWithLighting(*m_cubeMesh, shader, windowModel);
+    const glm::vec3 whiteMod(0.72f, 0.72f, 0.74f);
+    const glm::vec3 darkBlue(0.05f, 0.12f, 0.40f);
+    const glm::vec3 metal(0.82f, 0.82f, 0.85f);
+    const glm::vec3 goldFoil(0.95f, 0.68f, 0.18f);
+    const glm::vec3 thrusterGrey(0.55f, 0.50f, 0.45f);
 
-    // - Sensor Turret Nose: Tiny dark grey cylinder at the nose tip
-    glm::mat4 sensorNoseModel = modelBase;
-    sensorNoseModel = glm::translate(sensorNoseModel, glm::vec3(0.0f, 0.0f, 0.015f));
-    sensorNoseModel = glm::rotate(sensorNoseModel, glm::radians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
-    sensorNoseModel = glm::scale(sensorNoseModel, glm::vec3(0.002f, 0.002f, 0.002f));
-    shader.setVec3("colorOverride", glm::vec3(0.2f, 0.2f, 0.22f)); // dark carbon
-    renderer.renderWithLighting(*m_cylinderMesh, shader, sensorNoseModel);
+    // Spacecraft bus body.
+    renderCube(modelBase, glm::vec3(0.0f), glm::vec3(0.020f, 0.018f, 0.025f), glm::vec3(0.0f), whiteMod);
 
-    // - Red Sensor Eye: Tiny red cube on the nose tip (glowing)
-    glm::mat4 sensorEyeModel = modelBase;
-    sensorEyeModel = glm::translate(sensorEyeModel, glm::vec3(0.0f, 0.0f, 0.016f));
-    sensorEyeModel = glm::scale(sensorEyeModel, glm::vec3(0.0008f, 0.0008f, 0.0008f));
-    shader.setVec3("colorOverride", glm::vec3(1.0f, 0.1f, 0.1f)); // crimson red
-    shader.setFloat("emissiveStrength", 1.5f);
-    renderer.render(*m_cubeMesh, shader, sensorEyeModel);
+    // High-gain antenna dish and feed, facing the forward/Earth-pointing side of the probe.
+    renderCylinder(modelBase, glm::vec3(0.0f, 0.0f, 0.016f), glm::vec3(0.015f, 0.002f, 0.015f),
+                   glm::vec3(glm::radians(90.0f), 0.0f, 0.0f), metal);
+    renderCylinder(modelBase, glm::vec3(0.0f, 0.0f, 0.024f), glm::vec3(0.0012f, 0.010f, 0.0012f),
+                   glm::vec3(glm::radians(90.0f), 0.0f, 0.0f), metal);
+    renderCylinder(modelBase, glm::vec3(0.0f, 0.0f, 0.030f), glm::vec3(0.0022f, 0.0015f, 0.0022f),
+                   glm::vec3(glm::radians(90.0f), 0.0f, 0.0f), metal);
+
+    // Solar panel wings with slim support booms.
+    renderCylinder(modelBase, glm::vec3(-0.020f, 0.0f, 0.0f), glm::vec3(0.0008f, 0.020f, 0.0008f),
+                   glm::vec3(0.0f, 0.0f, glm::radians(90.0f)), metal);
+    renderCylinder(modelBase, glm::vec3(0.020f, 0.0f, 0.0f), glm::vec3(0.0008f, 0.020f, 0.0008f),
+                   glm::vec3(0.0f, 0.0f, glm::radians(90.0f)), metal);
+    renderCube(modelBase, glm::vec3(-0.030f, 0.0f, 0.0f), glm::vec3(0.028f, 0.0003f, 0.010f), glm::vec3(0.0f), darkBlue);
+    renderCube(modelBase, glm::vec3(0.030f, 0.0f, 0.0f), glm::vec3(0.028f, 0.0003f, 0.010f), glm::vec3(0.0f), darkBlue);
+
+    // Subtle solar-cell grid strips.
+    renderCube(modelBase, glm::vec3(-0.030f, 0.00025f, -0.0025f), glm::vec3(0.027f, 0.0002f, 0.0004f), glm::vec3(0.0f), glm::vec3(0.18f, 0.28f, 0.58f));
+    renderCube(modelBase, glm::vec3(-0.030f, 0.00025f, 0.0025f), glm::vec3(0.027f, 0.0002f, 0.0004f), glm::vec3(0.0f), glm::vec3(0.18f, 0.28f, 0.58f));
+    renderCube(modelBase, glm::vec3(0.030f, 0.00025f, -0.0025f), glm::vec3(0.027f, 0.0002f, 0.0004f), glm::vec3(0.0f), glm::vec3(0.18f, 0.28f, 0.58f));
+    renderCube(modelBase, glm::vec3(0.030f, 0.00025f, 0.0025f), glm::vec3(0.027f, 0.0002f, 0.0004f), glm::vec3(0.0f), glm::vec3(0.18f, 0.28f, 0.58f));
+
+    // Aft thruster nozzle: a short neck and flared bell.
+    renderCylinder(modelBase, glm::vec3(0.0f, 0.0f, -0.016f), glm::vec3(0.006f, 0.008f, 0.006f),
+                   glm::vec3(glm::radians(90.0f), 0.0f, 0.0f), thrusterGrey);
+    renderCone(modelBase, glm::vec3(0.0f, 0.0f, -0.022f), glm::vec3(0.010f, 0.010f, 0.010f),
+               glm::vec3(glm::radians(-90.0f), 0.0f, 0.0f), thrusterGrey);
+
+    // Animated ion exhaust plume behind the aft thruster.
+    float plumeScale = 0.8f + 0.2f * std::sin(static_cast<float>(glfwGetTime()) * 12.0f);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE);
+    shader.setFloat("emissiveStrength", 1.2f);
+    shader.setFloat("globalAlpha", 0.7f * plumeScale);
+    shader.setVec3("colorOverride", glm::vec3(0.5f, 0.8f, 1.0f));
+
+    glm::mat4 plumeMat = glm::translate(modelBase, glm::vec3(0.0f, 0.0f, -0.022f));
+    plumeMat = glm::rotate(plumeMat, glm::radians(-90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+    plumeMat = glm::scale(plumeMat, glm::vec3(0.004f, 0.008f * plumeScale, 0.004f));
+    renderer.renderWithLighting(*m_coneMesh, shader, plumeMat);
+
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     shader.setFloat("emissiveStrength", 0.0f);
+    shader.setFloat("globalAlpha", 1.0f);
 
-    // 2c. Left and Right Solar Panel Wings:
-    // Left Mast
-    glm::mat4 leftMastModel = modelBase;
-    leftMastModel = glm::translate(leftMastModel, glm::vec3(-0.0075f, 0.0f, -0.002f));
-    leftMastModel = glm::rotate(leftMastModel, glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f)); // align along X
-    leftMastModel = glm::scale(leftMastModel, glm::vec3(0.001f, 0.006f, 0.001f));
-    shader.setVec3("colorOverride", glm::vec3(0.55f, 0.55f, 0.58f));
-    renderer.renderWithLighting(*m_cylinderMesh, shader, leftMastModel);
+    // Thermal blanket gold foil patches on the bus sides.
+    renderCube(modelBase, glm::vec3(0.0f, 0.0094f, 0.001f), glm::vec3(0.015f, 0.0008f, 0.018f), glm::vec3(0.0f), goldFoil);
+    renderCube(modelBase, glm::vec3(0.0f, -0.0094f, -0.002f), glm::vec3(0.013f, 0.0008f, 0.016f), glm::vec3(0.0f), goldFoil);
+    renderCube(modelBase, glm::vec3(-0.0104f, 0.0f, -0.002f), glm::vec3(0.0008f, 0.012f, 0.014f), glm::vec3(0.0f), goldFoil);
+    renderCube(modelBase, glm::vec3(0.0104f, 0.0f, 0.002f), glm::vec3(0.0008f, 0.012f, 0.014f), glm::vec3(0.0f), goldFoil);
 
-    // Left Panel (split into two segments for higher detail/realism)
-    glm::mat4 leftPanelModel1 = modelBase;
-    leftPanelModel1 = glm::translate(leftPanelModel1, glm::vec3(-0.0155f, 0.0f, -0.002f));
-    leftPanelModel1 = glm::scale(leftPanelModel1, glm::vec3(0.008f, 0.0005f, 0.008f));
-    shader.setVec3("colorOverride", glm::vec3(0.04f, 0.16f, 0.38f)); // deep solar panel blue
-    renderer.renderWithLighting(*m_cubeMesh, shader, leftPanelModel1);
-
-    glm::mat4 leftPanelModel2 = modelBase;
-    leftPanelModel2 = glm::translate(leftPanelModel2, glm::vec3(-0.024f, 0.0f, -0.002f));
-    leftPanelModel2 = glm::scale(leftPanelModel2, glm::vec3(0.008f, 0.0005f, 0.008f));
-    shader.setVec3("colorOverride", glm::vec3(0.04f, 0.16f, 0.38f));
-    renderer.renderWithLighting(*m_cubeMesh, shader, leftPanelModel2);
-
-    // Right Mast
-    glm::mat4 rightMastModel = modelBase;
-    rightMastModel = glm::translate(rightMastModel, glm::vec3(0.0075f, 0.0f, -0.002f));
-    rightMastModel = glm::rotate(rightMastModel, glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-    rightMastModel = glm::scale(rightMastModel, glm::vec3(0.001f, 0.006f, 0.001f));
-    shader.setVec3("colorOverride", glm::vec3(0.55f, 0.55f, 0.58f));
-    renderer.renderWithLighting(*m_cylinderMesh, shader, rightMastModel);
-
-    // Right Panel (split into two segments)
-    glm::mat4 rightPanelModel1 = modelBase;
-    rightPanelModel1 = glm::translate(rightPanelModel1, glm::vec3(0.0155f, 0.0f, -0.002f));
-    rightPanelModel1 = glm::scale(rightPanelModel1, glm::vec3(0.008f, 0.0005f, 0.008f));
-    shader.setVec3("colorOverride", glm::vec3(0.04f, 0.16f, 0.38f));
-    renderer.renderWithLighting(*m_cubeMesh, shader, rightPanelModel1);
-
-    glm::mat4 rightPanelModel2 = modelBase;
-    rightPanelModel2 = glm::translate(rightPanelModel2, glm::vec3(0.024f, 0.0f, -0.002f));
-    rightPanelModel2 = glm::scale(rightPanelModel2, glm::vec3(0.008f, 0.0005f, 0.008f));
-    shader.setVec3("colorOverride", glm::vec3(0.04f, 0.16f, 0.38f));
-    renderer.renderWithLighting(*m_cubeMesh, shader, rightPanelModel2);
-
-    // 2d. Engine Nozzle:
-    // - Dark carbon cone at the rear, wide end pointing backward
-    glm::mat4 nozzleModel = modelBase;
-    nozzleModel = glm::translate(nozzleModel, glm::vec3(0.0f, 0.0f, -0.009f)); // attach to rear of gold core
-    nozzleModel = glm::rotate(nozzleModel, glm::radians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
-    nozzleModel = glm::scale(nozzleModel, glm::vec3(0.006f, 0.006f, 0.006f));
-    shader.setVec3("colorOverride", glm::vec3(0.22f, 0.22f, 0.25f)); // dark carbon grey
-    renderer.renderWithLighting(*m_coneMesh, shader, nozzleModel);
-
-    // 2e. Small Antenna Dish:
-    // - Mast pointing upward
-    glm::mat4 antennaMastModel = modelBase;
-    antennaMastModel = glm::translate(antennaMastModel, glm::vec3(0.0f, 0.006f, 0.002f));
-    antennaMastModel = glm::scale(antennaMastModel, glm::vec3(0.0008f, 0.006f, 0.0008f)); // thin cylinder along Y
-    shader.setVec3("colorOverride", glm::vec3(0.6f, 0.6f, 0.62f));
-    renderer.renderWithLighting(*m_cylinderMesh, shader, antennaMastModel);
-
-    // - Flat cone dish on top, tilted forward
-    glm::mat4 dishModel = modelBase;
-    dishModel = glm::translate(dishModel, glm::vec3(0.0f, 0.009f, 0.002f));
-    dishModel = glm::rotate(dishModel, glm::radians(60.0f), glm::vec3(1.0f, 0.0f, 0.0f)); // tilt forward
-    dishModel = glm::scale(dishModel, glm::vec3(0.0045f, 0.0012f, 0.0045f));
-    shader.setVec3("colorOverride", glm::vec3(0.82f, 0.82f, 0.84f)); // off-white grey
-    renderer.renderWithLighting(*m_coneMesh, shader, dishModel);
-
-    // 2f. Glowing Dual-Core Engine Exhaust Plume (semi-transparent)
-    float timeVal = (float)glfwGetTime();
-    float flicker = 1.0f + 0.12f * std::sin(timeVal * 26.0f);
-    float lengthMod = 1.0f + 0.08f * std::cos(timeVal * 19.0f);
-
-    // Disable depth write for transparent blending
-    glDepthMask(GL_FALSE);
-
-    // Outer plume: brilliant fiery orange cone expanding backward
-    glm::mat4 outerExhaustModel = modelBase;
-    outerExhaustModel = glm::translate(outerExhaustModel, glm::vec3(0.0f, 0.0f, -0.024f)); // centered further back
-    outerExhaustModel = glm::rotate(outerExhaustModel, glm::radians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
-    outerExhaustModel = glm::scale(outerExhaustModel, glm::vec3(0.0045f * flicker, 0.024f * lengthMod, 0.0045f * flicker));
-
-    shader.setVec3("colorOverride", glm::vec3(1.0f, 0.45f, 0.02f)); // fiery orange
-    shader.setFloat("emissiveStrength", 2.0f);
-    shader.setFloat("globalAlpha", 0.45f);
-    renderer.render(*m_coneMesh, shader, outerExhaustModel);
-
-    // Inner core: intense hot cyan/blue cone
-    glm::mat4 innerExhaustModel = modelBase;
-    innerExhaustModel = glm::translate(innerExhaustModel, glm::vec3(0.0f, 0.0f, -0.019f)); // shorter, closer to nozzle
-    innerExhaustModel = glm::rotate(innerExhaustModel, glm::radians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
-    innerExhaustModel = glm::scale(innerExhaustModel, glm::vec3(0.0022f * flicker, 0.014f * lengthMod, 0.0022f * flicker));
-
-    shader.setVec3("colorOverride", glm::vec3(0.0f, 0.85f, 1.0f)); // intense cyan-blue core
-    shader.setFloat("emissiveStrength", 3.0f);
-    shader.setFloat("globalAlpha", 0.8f);
-    renderer.render(*m_coneMesh, shader, innerExhaustModel);
-
-    // Re-enable depth write and reset states
-    glDepthMask(GL_TRUE);
     shader.setFloat("emissiveStrength", 0.0f);
     shader.setFloat("globalAlpha", 1.0f);
     shader.setBool("useColorOverride", false);

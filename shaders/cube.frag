@@ -151,8 +151,10 @@ void main() {
         if (useLighting) {
             vec3 lightDir = normalize(lightPos - FragPos);
             float diff = max(dot(norm, lightDir), 0.0);
-            vec3 textureAmbient = 0.03 * lightColor;
-            vec3 textureDiffuse = diff * lightColor;
+            float visibilityFill = 0.16;
+            float wrappedDiff = max(diff * 0.82 + 0.18, visibilityFill);
+            vec3 textureAmbient = visibilityFill * lightColor;
+            vec3 textureDiffuse = wrappedDiff * lightColor;
             FragColor = vec4((textureAmbient + textureDiffuse) * jupColor, globalAlpha * pointSpriteAlpha);
         } else {
             FragColor = vec4(jupColor, globalAlpha * pointSpriteAlpha);
@@ -563,8 +565,10 @@ void main() {
 
     if (useTexture) {
         vec3 texColor = texture(planetTexture, TexCoords).rgb;
-        vec3 textureAmbient = 0.03 * lightColor;
-        vec3 textureDiffuse = diff * lightColor;
+        float visibilityFill = 0.14;
+        float wrappedDiff = max(diff * 0.82 + 0.18, visibilityFill);
+        vec3 textureAmbient = visibilityFill * lightColor;
+        vec3 textureDiffuse = wrappedDiff * lightColor;
         FragColor = vec4((textureAmbient + textureDiffuse) * texColor, globalAlpha * pointSpriteAlpha);
         return;
     }

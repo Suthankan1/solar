@@ -114,7 +114,8 @@ void main() {
         float dayFactor = smoothstep(0.0, 0.15, sunDot);
         vec3 dayColor = texture(planetTexture, TexCoords).rgb;
         vec3 nightColor = texture(nightTexture, TexCoords).rgb * 1.8;
-        vec3 surface = mix(nightColor, dayColor, dayFactor);
+        vec3 darkSideFill = dayColor * 0.16;
+        vec3 surface = mix(max(nightColor, darkSideFill), dayColor, dayFactor);
 
         // Twilight orange rim:
         float twi = smoothstep(0.0, 0.2, sunDot) - smoothstep(0.15, 0.3, sunDot);

@@ -77,6 +77,26 @@ enum class DemoStage {
 
 float UI_SCALE = 1.35f;
 
+namespace {
+struct PlanetLayout {
+    float radius;
+    float semiMajorAxis;
+    float semiMinorAxis;
+};
+
+constexpr PlanetLayout kMercuryLayout{0.20f, 2.0f, 1.75f};
+constexpr PlanetLayout kVenusLayout{0.32f, 2.9f, 2.86f};
+constexpr PlanetLayout kEarthLayout{0.42f, 4.2f, 4.16f};
+constexpr PlanetLayout kMarsLayout{0.32f, 5.9f, 5.64f};
+constexpr PlanetLayout kJupiterLayout{1.05f, 10.2f, 10.0f};
+constexpr PlanetLayout kSaturnLayout{0.90f, 14.1f, 13.85f};
+constexpr PlanetLayout kUranusLayout{0.62f, 17.4f, 17.15f};
+constexpr PlanetLayout kNeptuneLayout{0.58f, 20.1f, 19.85f};
+
+constexpr float kAsteroidBeltInnerRadius = 7.1f;
+constexpr float kAsteroidBeltOuterRadius = 8.3f;
+}
+
 // Project 3D world position to 2D screen position
 static bool projectWorldToScreen(const glm::vec3& worldPos, const glm::mat4& view, const glm::mat4& projection, int width, int height, glm::vec2& screenPos) {
     glm::vec4 clipSpacePos = projection * view * glm::vec4(worldPos, 1.0f);
@@ -121,16 +141,16 @@ int main() {
         auto sun = std::make_shared<Sun>("Sun", 1.2f, glm::vec3(1.0f, 0.65f, 0.0f), glm::vec3(1.0f, 0.95f, 0.8f), "textures/sun.jpg");
         auto sunHalo = std::make_shared<SunHalo>("SunHalo", 1.3f, 2.8f);
         // Create Planets (name, radius, semiMajorAxis, semiMinorAxis, inclination, orbitSpeed, rotationSpeed, color, texturePath, orbitPhaseOffset, longitudeOfAscendingNode)
-        auto mercury = std::make_shared<Planet>("Mercury", 0.20f, 2.0f, 1.75f, 7.0f, 1.6f, 3.0f, glm::vec3(0.76f, 0.70f, 0.65f), "textures/mercury.jpg", 0.5f, 48.3f);
-        auto venus = std::make_shared<Planet>("Venus", 0.32f, 2.8f, 2.795f, 3.4f, 1.1f, 0.4f, glm::vec3(0.95f, 0.85f, 0.55f), "textures/venus.jpg", 1.2f, 76.7f);
-        auto earth = std::make_shared<Planet>("Earth", 0.38f, 3.8f, 3.76f, 0.0f, 0.9f, 1.8f, glm::vec3(0.25f, 0.55f, 0.95f), "textures/earth.jpg", 0.0f, 0.0f);
-        auto mars = std::make_shared<Planet>("Mars", 0.28f, 5.0f, 4.75f, 1.85f, 0.7f, 1.7f, glm::vec3(0.80f, 0.35f, 0.20f), "textures/mars.jpg", 2.4f, 49.6f);
-        auto asteroidBelt = std::make_shared<AsteroidBelt>("AsteroidBelt", 5.6f, 6.4f, 2000);
-        auto jupiter = std::make_shared<Planet>("Jupiter", 0.90f, 7.0f, 6.85f, 1.3f, 0.4f, 2.5f, glm::vec3(0.85f, 0.72f, 0.58f), "textures/jupiter.jpg", 3.8f, 100.5f);
-        auto saturn = std::make_shared<Planet>("Saturn", 0.78f, 9.5f, 9.3f, 2.48f, 0.3f, 2.2f, glm::vec3(0.92f, 0.86f, 0.65f), "textures/saturn.jpg", 4.5f, 113.7f);
+        auto mercury = std::make_shared<Planet>("Mercury", kMercuryLayout.radius, kMercuryLayout.semiMajorAxis, kMercuryLayout.semiMinorAxis, 7.0f, 1.6f, 3.0f, glm::vec3(0.76f, 0.70f, 0.65f), "textures/mercury.jpg", 0.5f, 48.3f);
+        auto venus = std::make_shared<Planet>("Venus", kVenusLayout.radius, kVenusLayout.semiMajorAxis, kVenusLayout.semiMinorAxis, 3.4f, 1.1f, 0.4f, glm::vec3(0.95f, 0.85f, 0.55f), "textures/venus.jpg", 1.2f, 76.7f);
+        auto earth = std::make_shared<Planet>("Earth", kEarthLayout.radius, kEarthLayout.semiMajorAxis, kEarthLayout.semiMinorAxis, 0.0f, 0.9f, 1.8f, glm::vec3(0.25f, 0.55f, 0.95f), "textures/earth.jpg", 0.0f, 0.0f);
+        auto mars = std::make_shared<Planet>("Mars", kMarsLayout.radius, kMarsLayout.semiMajorAxis, kMarsLayout.semiMinorAxis, 1.85f, 0.7f, 1.7f, glm::vec3(0.80f, 0.35f, 0.20f), "textures/mars.jpg", 2.4f, 49.6f);
+        auto asteroidBelt = std::make_shared<AsteroidBelt>("AsteroidBelt", kAsteroidBeltInnerRadius, kAsteroidBeltOuterRadius, 2000);
+        auto jupiter = std::make_shared<Planet>("Jupiter", kJupiterLayout.radius, kJupiterLayout.semiMajorAxis, kJupiterLayout.semiMinorAxis, 1.3f, 0.4f, 2.5f, glm::vec3(0.85f, 0.72f, 0.58f), "textures/jupiter.jpg", 3.8f, 100.5f);
+        auto saturn = std::make_shared<Planet>("Saturn", kSaturnLayout.radius, kSaturnLayout.semiMajorAxis, kSaturnLayout.semiMinorAxis, 2.48f, 0.3f, 2.2f, glm::vec3(0.92f, 0.86f, 0.65f), "textures/saturn.jpg", 4.5f, 113.7f);
         auto saturnRings = std::make_shared<SaturnRings>("SaturnRings", saturn);
-        auto uranus = std::make_shared<Planet>("Uranus", 0.55f, 11.5f, 11.3f, 0.77f, 0.2f, 1.4f, glm::vec3(0.55f, 0.85f, 0.90f), "textures/uranus.jpg", 5.1f, 74.0f);
-        auto neptune = std::make_shared<Planet>("Neptune", 0.50f, 13.5f, 13.3f, 1.77f, 0.15f, 1.5f, glm::vec3(0.25f, 0.40f, 0.95f), "textures/neptune.jpg", 1.8f, 131.8f);
+        auto uranus = std::make_shared<Planet>("Uranus", kUranusLayout.radius, kUranusLayout.semiMajorAxis, kUranusLayout.semiMinorAxis, 0.77f, 0.2f, 1.4f, glm::vec3(0.55f, 0.85f, 0.90f), "textures/uranus.jpg", 5.1f, 74.0f);
+        auto neptune = std::make_shared<Planet>("Neptune", kNeptuneLayout.radius, kNeptuneLayout.semiMajorAxis, kNeptuneLayout.semiMinorAxis, 1.77f, 0.15f, 1.5f, glm::vec3(0.25f, 0.40f, 0.95f), "textures/neptune.jpg", 1.8f, 131.8f);
 
         // Create Orbit Rings (name + "Orbit", planet, color, parent)
         auto mercuryOrbit = std::make_shared<Orbit>("MercuryOrbit", mercury, glm::vec3(0.4f, 0.38f, 0.36f), nullptr);
@@ -203,8 +223,8 @@ int main() {
         sceneManager.registerObject(starfield);
 
         // 4. Create and Register Cameras
-        auto sysCamera = std::make_shared<StaticCamera>("SystemCamera", glm::vec3(0.0f, 6.5f, 9.5f), glm::vec3(0.0f, 0.0f, 0.0f));
-        auto freeCamera = std::make_shared<FreeCamera>("FreeCamera", glm::vec3(0.0f, 4.0f, 8.0f));
+        auto sysCamera = std::make_shared<StaticCamera>("SystemCamera", glm::vec3(0.0f, 9.5f, 18.0f), glm::vec3(0.0f, 0.0f, 0.0f));
+        auto freeCamera = std::make_shared<FreeCamera>("FreeCamera", glm::vec3(0.0f, 5.0f, 12.0f));
         auto spacecraftCamera = std::make_shared<SpacecraftFollowCamera>("Spacecraft Follow", spacecraft, 0.08f, 0.025f);
         auto trackingCamera = std::make_shared<TrackingCamera>("Planet Focus", earth, glm::vec3(0.0f, 0.36f, 0.72f));
 
@@ -282,7 +302,7 @@ int main() {
                 "Realistic Solar System Explorer",
                 "An interactive OpenGL simulation of our celestial neighborhood, showcasing orbits, textures, lighting, and spacecraft.",
                 "Perspective Projection, Camera Transforms & Orbital Trajectories", "", 0.8f,
-                glm::vec3(12.0f, 6.0f, -12.0f), glm::vec3(15.0f, 8.0f, -15.0f), glm::vec3(-18.0f, 9.5f, 18.0f), glm::vec3(-22.0f, 11.0f, 22.0f),
+                glm::vec3(16.0f, 8.0f, -16.0f), glm::vec3(20.0f, 10.0f, -20.0f), glm::vec3(-24.0f, 13.0f, 24.0f), glm::vec3(-30.0f, 15.0f, 30.0f),
                 glm::vec3(0.0f), glm::vec3(0.0f), glm::vec3(0.0f), glm::vec3(0.0f)
             },
             // 2. Sun Zoom (15-35s)
@@ -318,7 +338,7 @@ int main() {
                 "Earth: Blue Oasis",
                 "Our home planet. The only known world in the universe hosting liquid surface water, an active biosphere, and human life.",
                 "Multi-texturing, Atmosphere Scattering Glow & Alpha Blended Clouds", "Earth", 2.0f,
-                glm::vec3(0.65f, 0.28f, -0.35f), glm::vec3(0.55f, 0.22f, 0.0f), glm::vec3(-0.35f, 0.10f, 0.28f), glm::vec3(-0.42f, -0.02f, 0.35f),
+                glm::vec3(0.95f, 0.42f, -0.56f), glm::vec3(0.78f, 0.32f, 0.0f), glm::vec3(-0.58f, 0.18f, 0.42f), glm::vec3(-0.68f, -0.04f, 0.52f),
                 glm::vec3(0.0f), glm::vec3(0.0f), glm::vec3(0.0f), glm::vec3(0.0f)
             },
             // 6. Mars View (53-60s)
@@ -327,7 +347,7 @@ int main() {
                 "Mars: The Red Planet",
                 "Featuring iron-rich rusty soil, thin atmosphere, polar carbon dioxide ice caps, and ancient volcanic valleys.",
                 "Realistic Scale Factors & Specular Mapping", "Mars", 1.8f,
-                glm::vec3(0.50f, 0.18f, -0.22f), glm::vec3(0.42f, 0.14f, 0.0f), glm::vec3(-0.30f, 0.06f, 0.22f), glm::vec3(-0.38f, -0.04f, 0.28f),
+                glm::vec3(0.78f, 0.28f, -0.36f), glm::vec3(0.62f, 0.20f, 0.0f), glm::vec3(-0.46f, 0.10f, 0.34f), glm::vec3(-0.56f, -0.04f, 0.42f),
                 glm::vec3(0.0f), glm::vec3(0.0f), glm::vec3(0.0f), glm::vec3(0.0f)
             },
             // 7. Earth & Moon (60-80s)
@@ -363,7 +383,7 @@ int main() {
                 "The Asteroid Belt",
                 "Navigating through the annular debris belt situated between the orbits of Mars and Jupiter.",
                 "Dynamic Instanced Particle Simulation & GL_POINTS; GL_POINTS instanced simulation, 800 varied particles, 3 size tiers", "AsteroidBelt", 1.5f,
-                glm::vec3(5.0f, 0.8f, -0.5f), glm::vec3(5.5f, 0.3f, 1.0f), glm::vec3(6.5f, -0.2f, 2.5f), glm::vec3(7.2f, -0.5f, 3.5f),
+                glm::vec3(7.2f, 1.0f, -0.7f), glm::vec3(7.8f, 0.4f, 1.2f), glm::vec3(8.8f, -0.2f, 2.8f), glm::vec3(9.6f, -0.5f, 4.0f),
                 glm::vec3(0.0f), glm::vec3(0.0f), glm::vec3(0.0f), glm::vec3(0.0f)
             },
             // 11. Jupiter View (145-155s)
@@ -372,7 +392,7 @@ int main() {
                 "Jupiter: The Gas Giant",
                 "The largest planet in the solar system, a massive gas giant with prominent atmospheric bands and multiple moons.",
                 "Scale-Proportional Texture Coordinates & Orbit Tracing", "Jupiter", 0.9f,
-                glm::vec3(1.6f, 0.6f, -1.0f), glm::vec3(1.4f, 0.4f, 0.0f), glm::vec3(-1.0f, 0.2f, 1.0f), glm::vec3(-1.2f, 0.1f, 1.4f),
+                glm::vec3(2.2f, 0.9f, -1.4f), glm::vec3(1.9f, 0.6f, 0.0f), glm::vec3(-1.5f, 0.35f, 1.5f), glm::vec3(-1.8f, 0.15f, 2.0f),
                 glm::vec3(0.0f), glm::vec3(0.0f), glm::vec3(0.0f), glm::vec3(0.0f)
             },
             // 12. Saturn Rings View (155-165s)
@@ -381,7 +401,7 @@ int main() {
                 "Saturn: Ring World",
                 "Sweeping down close to Saturn's spectacular rings, composed of billions of water ice particles and dust.",
                 "Custom Ring Mesh Geometry & Double-Sided Alpha Blending", "Saturn", 0.8f,
-                glm::vec3(1.8f, 0.8f, -0.8f), glm::vec3(1.5f, 0.6f, 0.0f), glm::vec3(-1.1f, -0.05f, 1.0f), glm::vec3(-1.4f, -0.3f, 1.3f),
+                glm::vec3(2.8f, 1.2f, -1.4f), glm::vec3(2.3f, 0.9f, 0.0f), glm::vec3(-1.9f, 0.05f, 1.7f), glm::vec3(-2.3f, -0.35f, 2.2f),
                 glm::vec3(0.0f), glm::vec3(0.0f), glm::vec3(0.0f), glm::vec3(0.0f)
             },
             // 13. Credits/Final Wide (165-180s)
@@ -390,7 +410,7 @@ int main() {
                 "Solar System Simulation",
                 "Built using C++, Modern OpenGL, GLFW, Glad, and GLM. Thank you for watching!",
                 "Post-Processing Framebuffers, HDR Tone Mapping & Bloom", "", 0.5f,
-                glm::vec3(0.0f, 6.0f, 16.0f), glm::vec3(0.0f, 7.5f, 18.0f), glm::vec3(0.0f, 18.0f, 32.0f), glm::vec3(0.0f, 22.0f, 38.0f),
+                glm::vec3(0.0f, 8.0f, 24.0f), glm::vec3(0.0f, 10.0f, 28.0f), glm::vec3(0.0f, 22.0f, 42.0f), glm::vec3(0.0f, 28.0f, 52.0f),
                 glm::vec3(0.0f), glm::vec3(0.0f), glm::vec3(0.0f), glm::vec3(0.0f)
             }
         };
@@ -566,13 +586,13 @@ int main() {
                 std::shared_ptr<Camera> oldCam = sceneManager.getActiveCamera();
                 if (glfwGetKey(glWin, GLFW_KEY_1) == GLFW_PRESS) {
                     sceneManager.setActiveCamera(sysCamera);
-                    sysCamera->setTargetView(glm::vec3(0.0f, 6.5f, 9.5f), glm::vec3(0.0f, 0.0f, 0.0f));
+                    sysCamera->setTargetView(glm::vec3(0.0f, 9.5f, 18.0f), glm::vec3(0.0f, 0.0f, 0.0f));
                 } else if (glfwGetKey(glWin, GLFW_KEY_2) == GLFW_PRESS) {
                     sceneManager.setActiveCamera(sysCamera);
-                    sysCamera->setTargetView(glm::vec3(0.0f, 20.0f, 0.5f), glm::vec3(0.0f, 0.0f, 0.0f));
+                    sysCamera->setTargetView(glm::vec3(0.0f, 30.0f, 0.8f), glm::vec3(0.0f, 0.0f, 0.0f));
                 } else if (glfwGetKey(glWin, GLFW_KEY_3) == GLFW_PRESS) {
                     sceneManager.setActiveCamera(sysCamera);
-                    sysCamera->setTargetView(glm::vec3(18.0f, 1.0f, 0.0f), glm::vec3(0.0f, 0.0f, 0.0f));
+                    sysCamera->setTargetView(glm::vec3(28.0f, 1.5f, 0.0f), glm::vec3(0.0f, 0.0f, 0.0f));
                 } else if (glfwGetKey(glWin, GLFW_KEY_4) == GLFW_PRESS) {
                     sceneManager.setActiveCamera(freeCamera);
                 } else if (glfwGetKey(glWin, GLFW_KEY_5) == GLFW_PRESS) {

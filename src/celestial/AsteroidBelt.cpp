@@ -76,7 +76,12 @@ AsteroidBelt::AsteroidBelt(const std::string& name, float innerRadius, float out
     m_speedMultipliers.reserve(m_count);
     m_angles.reserve(m_count);
     const float PI = 3.14159265359f;
-    const float heroRadii[] = {5.8f, 6.1f, 6.4f};
+    const float beltWidth = outerRadius - innerRadius;
+    const float heroRadii[] = {
+        innerRadius + beltWidth * 0.18f,
+        innerRadius + beltWidth * 0.52f,
+        innerRadius + beltWidth * 0.86f
+    };
     const float heroInitialAngles[] = {0.35f * PI, 1.15f * PI, 1.75f * PI};
 
     auto rand01 = []() {

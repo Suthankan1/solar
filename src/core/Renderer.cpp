@@ -172,7 +172,7 @@ void Renderer::beginFrame() {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 }
 
-void Renderer::endFrame(bool bloomEnabled) {
+void Renderer::endFrame(bool bloomEnabled, float vignetteStrength) {
     // Unbind HDR FBO to render to default framebuffer (or ping-pong FBOs)
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
@@ -219,6 +219,7 @@ void Renderer::endFrame(bool bloomEnabled) {
         m_bloomShader->setBool("bloom", bloomEnabled);
         m_bloomShader->setFloat("exposure", 1.2f);
         m_bloomShader->setFloat("bloomIntensity", 0.8f);
+        m_bloomShader->setFloat("vignetteStrength", vignetteStrength);
 
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         renderQuad();

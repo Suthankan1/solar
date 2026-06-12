@@ -63,7 +63,7 @@ public:
 
     // Framebuffer-based post-processing methods
     void beginFrame();
-    void endFrame(bool bloomEnabled);
+    void endFrame(bool bloomEnabled, float vignetteStrength = 0.0f);
 
     // Static shape generators to support modern OpenGL data management
     static Mesh createSphere(float radius, unsigned int rings, unsigned int sectors);

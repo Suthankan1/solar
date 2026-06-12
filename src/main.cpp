@@ -22,6 +22,8 @@
 #include <memory>
 #include <vector>
 #include <sstream>
+#define GLM_ENABLE_EXPERIMENTAL
+#include <glm/gtx/quaternion.hpp>
 
 struct PlanetInfo {
     std::string name;
@@ -241,6 +243,8 @@ int main() {
 
         bool bloomEnabled = true;
         bool gWasPressed = false;
+        bool vignetteActive = true;
+        bool vWasPressed = false;
 
         DemoStage currentDemo = DemoStage::NONE;
         float demoTimer = 0.0f;
@@ -634,6 +638,14 @@ int main() {
             }
             lWasPressed = lIsPressed;
 
+            // V key to toggle vignette post-effect
+            bool vIsPressed = (glfwGetKey(glWin, GLFW_KEY_V) == GLFW_PRESS);
+            if (vIsPressed && !vWasPressed) {
+                vignetteActive = !vignetteActive;
+                std::cout << "Vignette Effect " << (vignetteActive ? "ENABLED" : "DISABLED") << std::endl;
+            }
+            vWasPressed = vIsPressed;
+
 
             // Demo mode F1 key detection
             bool f1IsPressed = (glfwGetKey(glWin, GLFW_KEY_F1) == GLFW_PRESS);
@@ -712,8 +724,14 @@ int main() {
 
                     glm::vec3 finalPos = idealPos;
                     glm::vec3 finalLookAt = idealLookAt;
+                    glm::vec3 finalFront = glm::vec3(0.0f, 0.0f, -1.0f);
+                    bool hasFinalFront = false;
+                    if (glm::length(idealLookAt - idealPos) > 0.0001f) {
+                        finalFront = glm::normalize(idealLookAt - idealPos);
+                        hasFinalFront = true;
+                    }
 
-                    const float transitionDuration = 2.5f;
+                    const float transitionDuration = 3.5f;
                     if (stageTime < transitionDuration) {
                         if (currentSubStageIdx > 0) {
                             float prevEndTime = subStages[currentSubStageIdx - 1].startTime + subStages[currentSubStageIdx - 1].duration;
@@ -721,23 +739,41 @@ int main() {
                             getSubStageIdealState(currentSubStageIdx - 1, prevEndTime, prevPos, prevLookAt);
 
                             float u = stageTime / transitionDuration;
-                            float s = u * u * (3.0f - 2.0f * u);
+                            float s = u * u * u * (u * (u * 6.0f - 15.0f) + 10.0f);
                             finalPos = glm::mix(prevPos, idealPos, s);
-                            finalLookAt = glm::mix(prevLookAt, idealLookAt, s);
+                            glm::vec3 fromDir = prevLookAt - prevPos;
+                            glm::vec3 toDir = idealLookAt - idealPos;
+                            if (glm::length(fromDir) > 0.0001f && glm::length(toDir) > 0.0001f) {
+                                glm::quat qFrom = glm::quatLookAt(glm::normalize(fromDir), glm::vec3(0.0f, 1.0f, 0.0f));
+                                glm::quat qTo = glm::quatLookAt(glm::normalize(toDir), glm::vec3(0.0f, 1.0f, 0.0f));
+                                glm::quat qBlend = glm::slerp(qFrom, qTo, s);
+                                finalFront = glm::normalize(qBlend * glm::vec3(0.0f, 0.0f, -1.0f));
+                                hasFinalFront = true;
+                            }
                         } else {
                             float u = stageTime / transitionDuration;
-                            float s = u * u * (3.0f - 2.0f * u);
+                            float s = u * u * u * (u * (u * 6.0f - 15.0f) + 10.0f);
                             glm::vec3 prevPos = demoStartCamPos;
                             glm::vec3 prevLookAt = demoStartCamPos + demoStartCamFront * 5.0f;
                             finalPos = glm::mix(prevPos, idealPos, s);
-                            finalLookAt = glm::mix(prevLookAt, idealLookAt, s);
+                            glm::vec3 fromDir = prevLookAt - prevPos;
+                            glm::vec3 toDir = idealLookAt - idealPos;
+                            if (glm::length(fromDir) > 0.0001f && glm::length(toDir) > 0.0001f) {
+                                glm::quat qFrom = glm::quatLookAt(glm::normalize(fromDir), glm::vec3(0.0f, 1.0f, 0.0f));
+                                glm::quat qTo = glm::quatLookAt(glm::normalize(toDir), glm::vec3(0.0f, 1.0f, 0.0f));
+                                glm::quat qBlend = glm::slerp(qFrom, qTo, s);
+                                finalFront = glm::normalize(qBlend * glm::vec3(0.0f, 0.0f, -1.0f));
+                                hasFinalFront = true;
+                            }
                         }
                     }
 
                     auto activeCam = sceneManager.getActiveCamera();
                     if (activeCam) {
                         activeCam->setPosition(finalPos);
-                        if (glm::length(finalLookAt - finalPos) > 0.0001f) {
+                        if (hasFinalFront) {
+                            activeCam->setFront(finalFront);
+                        } else if (glm::length(finalLookAt - finalPos) > 0.0001f) {
                             activeCam->setFront(glm::normalize(finalLookAt - finalPos));
                         }
                         glm::vec3 worldUp = glm::vec3(0.0f, 1.0f, 0.0f);
@@ -755,7 +791,8 @@ int main() {
             sceneManager.render(renderer);
 
             // End FBO rendering and apply post-processing
-            renderer.endFrame(bloomEnabled);
+            float vignetteStrength = (currentDemo != DemoStage::NONE && vignetteActive) ? 1.0f : 0.0f;
+            renderer.endFrame(bloomEnabled, vignetteStrength);
 
             // Render text overlays (instructions in corners)
             int width = window.getWidth();
@@ -832,6 +869,32 @@ int main() {
                     textRenderer.renderQuad(0.0f, static_cast<float>(height) - barHeight, static_cast<float>(width), barHeight, glm::vec4(0.0f, 0.0f, 0.0f, 1.0f), width, height);
                 }
 
+                // Demo progress bar:
+                float barW = width * 0.70f;
+                float barX = (width - barW) / 2.0f;
+                float fill = demoTimer / 180.0f;
+                // Background track
+                textRenderer.renderQuad(barX, 8.0f, barW, 4.0f,
+                                        glm::vec4(1.0f, 1.0f, 1.0f, 0.12f), width, height);
+                // Gold fill
+                textRenderer.renderQuad(barX, 8.0f, barW * fill, 4.0f,
+                                        glm::vec4(0.85f, 0.68f, 0.15f, 0.85f), width, height);
+                // Playhead dot
+                textRenderer.renderQuad(barX + barW * fill - 2.0f, 6.0f, 4.0f, 8.0f,
+                                        glm::vec4(1.0f, 1.0f, 1.0f, 1.0f), width, height);
+
+                // Stage count and current scene name: "Scene X of Y - Name"
+                {
+                    std::string stageText = "Scene " + std::to_string(currentSubStageIdx + 1) + " of " + std::to_string(subStages.size()) + " - " + subStages[currentSubStageIdx].name;
+                    float stageScale = 0.7f * UI_SCALE;
+                    float stageW = stageText.length() * 8.0f * stageScale;
+                    float stageX = (width - stageW) / 2.0f;
+                    float stageY = 1.0f;
+                    textRenderer.renderText(stageText, stageX + 1.0f, stageY - 1.0f, stageScale, glm::vec4(0.0f, 0.0f, 0.0f, 0.7f), width, height);
+                    textRenderer.renderText(stageText, stageX, stageY, stageScale, glm::vec4(0.6f, 0.6f, 0.6f, 0.8f), width, height);
+                }
+
+
                 // B. Fade-in/fade-out logic for the HUD overlay (1.5s fade at ends)
                 float hudAlpha = 1.0f;
                 if (stageTime < 1.5f) {
@@ -903,22 +966,53 @@ int main() {
                 }
                 titleAlpha = glm::clamp(titleAlpha, 0.0f, 1.0f);
 
+                if (stageTime < 2.0f) {
+                    float sceneAlpha = glm::clamp(stageTime / 2.0f, 0.0f, 1.0f);
+                    float bgAlpha = 1.0f - sceneAlpha * sceneAlpha;
+                    textRenderer.renderQuad(0.0f, 0.0f, static_cast<float>(width), static_cast<float>(height),
+                                            glm::vec4(0.0f, 0.0f, 0.0f, bgAlpha * 0.88f), width, height);
+                }
+
                 if (titleAlpha > 0.0f) {
-                    std::string largeTitleStr = subStages[currentSubStageIdx].title;
+                    const auto& titleSub = subStages[currentSubStageIdx];
+                    std::string largeTitleStr = titleSub.title;
                     std::transform(largeTitleStr.begin(), largeTitleStr.end(), largeTitleStr.begin(), ::toupper);
                     float scale = 2.4f * UI_SCALE;
                     float textW = largeTitleStr.length() * 8.0f * scale;
                     float textX = (width - textW) / 2.0f;
                     float textY = height * 0.55f;
-                    
+
+                    if (titleSub.stage == DemoStage::CREDITS) {
+                        textY += (demoTimer - 165.0f) * 12.0f;
+                    }
+
                     // Shadow
-                    textRenderer.renderText(largeTitleStr, textX + 2.0f, textY - 2.0f, scale, glm::vec4(0.0f, 0.0f, 0.0f, titleAlpha * 0.8f), width, height);
+                    textRenderer.renderText(largeTitleStr, textX + 2.0f, textY - 2.0f, scale, glm::vec4(0.0f, 0.0f, 0.0f, titleAlpha * 0.85f), width, height);
                     // Foreground
                     textRenderer.renderText(largeTitleStr, textX, textY, scale, glm::vec4(1.0f, 0.9f, 0.5f, titleAlpha), width, height);
+
+                    textRenderer.renderQuad(textX - 20.0f, textY - 6.0f, textW + 40.0f, 3.0f,
+                                            glm::vec4(0.85f, 0.68f, 0.15f, titleAlpha), width, height);
+
+                    std::string subtitleStr;
+                    if (titleSub.stage == DemoStage::CREDITS) {
+                        subtitleStr = "MISSION COMPLETE";
+                    } else if (titleSub.highlight.empty()) {
+                        subtitleStr = "SOLAR SYSTEM MISSION";
+                    } else {
+                        subtitleStr = getPlanetInfo(titleSub.highlight).type;
+                    }
+                    std::transform(subtitleStr.begin(), subtitleStr.end(), subtitleStr.begin(), ::toupper);
+                    float subtitleScale = 0.95f * UI_SCALE;
+                    float subtitleW = subtitleStr.length() * 8.0f * subtitleScale;
+                    float subtitleX = (width - subtitleW) / 2.0f;
+                    float subtitleY = textY - 34.0f * UI_SCALE;
+                    textRenderer.renderText(subtitleStr, subtitleX + 2.0f, subtitleY - 2.0f, subtitleScale, glm::vec4(0.0f, 0.0f, 0.0f, titleAlpha * 0.85f), width, height);
+                    textRenderer.renderText(subtitleStr, subtitleX, subtitleY, subtitleScale, glm::vec4(0.78f, 0.82f, 0.88f, titleAlpha), width, height);
                 }
 
                 // F. Render Top-Right Demo Controls Reminder
-                std::string reminderStr = "[SPACE] Pause  [F1] Restart  [ESC] Exit  [L] Letterbox: " + std::string(letterboxActive ? "ON" : "OFF");
+                std::string reminderStr = "[SPACE] Pause  [F1] Restart  [ESC] Exit  [L] Letterbox: " + std::string(letterboxActive ? "ON" : "OFF") + "  [V] Vignette: " + std::string(vignetteActive ? "ON" : "OFF");
                 float remScale = 0.85f * UI_SCALE;
                 float remW = reminderStr.length() * 8.0f * remScale;
                 float remX = width - remW - 20.0f;
@@ -1009,7 +1103,7 @@ int main() {
                 textRenderer.renderQuad(blX, blY, blW, blH, manualBgCol, width, height);
                 
                 textRenderer.renderText("[1-5] Cameras | [N/B] Next/Prev Planet | [ENTER] Focus", blX + 15.0f * UI_SCALE, blY + blH - 22.0f * UI_SCALE, 0.95f * UI_SCALE, glm::vec3(1.0f, 1.0f, 1.0f), width, height);
-                textRenderer.renderText("[SPACE] Pause | [+/-] Speed | [F1] Demo Mode | [G] Bloom: " + std::string(bloomEnabled ? "ON" : "OFF"), blX + 15.0f * UI_SCALE, blY + blH - 42.0f * UI_SCALE, 0.95f * UI_SCALE, glm::vec3(1.0f, 1.0f, 1.0f), width, height);
+                textRenderer.renderText("[SPACE] Pause | [+/-] Speed | [F1] Demo Mode | [G] Bloom: " + std::string(bloomEnabled ? "ON" : "OFF") + " | [V] Vignette: " + std::string(vignetteActive ? "ON" : "OFF"), blX + 15.0f * UI_SCALE, blY + blH - 42.0f * UI_SCALE, 0.95f * UI_SCALE, glm::vec3(1.0f, 1.0f, 1.0f), width, height);
                 textRenderer.renderText("[ESC] Exit", blX + 15.0f * UI_SCALE, blY + blH - 62.0f * UI_SCALE, 0.95f * UI_SCALE, glm::vec3(0.5f, 0.5f, 0.5f), width, height);
             }
 

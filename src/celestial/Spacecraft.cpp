@@ -443,7 +443,7 @@ glm::vec3 Spacecraft::getPlanetPositionAtAngle(std::shared_ptr<Planet> planet, f
 
     // 2. Inclination
     float x1 = x0;
-    float y1 = z0 * std::sin(iRad);
+    float y1 = -z0 * std::sin(iRad);
     float z1 = z0 * std::cos(iRad);
 
     // 3. Longitude of ascending node

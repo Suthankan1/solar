@@ -35,6 +35,15 @@ void Moon::update(float deltaTime) {
 }
 
 void Moon::render(Renderer& renderer) {
+    // 1. Camera-distance cull: skip tiny moons when far away
+    float dist = glm::distance(renderer.getCameraPosition(), getPosition());
+    float size = m_transform.getScale().x;
+    if (dist > 15.0f && size < 0.15f) return;
+
+    // 2. Frustum cull: skip objects outside the camera view frustum
+    if (!renderer.sphereInFrustum(getPosition(), getRadius() * 2.0f))
+        return;
+
     glm::mat4 model = m_transform.getModelMatrix();
 
     const Shader& shader = renderer.getShader();

@@ -135,6 +135,7 @@ void Starfield::render(Renderer& renderer) {
     shader.setBool("useColorOverride", false);
     shader.setFloat("time", (float)glfwGetTime());
     shader.setBool("isStarfield", true);
+    shader.setInt("planetId", -99);
 
     // Disable depth write so stars always render behind everything else
     glDepthMask(GL_FALSE);

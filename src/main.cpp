@@ -281,7 +281,7 @@ int main() {
                 DemoStage::OPENING_WIDE, "Opening Wide", 0.0f, 15.0f,
                 "Realistic Solar System Explorer",
                 "An interactive OpenGL simulation of our celestial neighborhood, showcasing orbits, textures, lighting, and spacecraft.",
-                "Perspective Projection, Camera Transforms & Orbital Trajectories", "", 1.0f,
+                "Perspective Projection, Camera Transforms & Orbital Trajectories", "", 0.8f,
                 glm::vec3(12.0f, 6.0f, -12.0f), glm::vec3(15.0f, 8.0f, -15.0f), glm::vec3(-18.0f, 9.5f, 18.0f), glm::vec3(-22.0f, 11.0f, 22.0f),
                 glm::vec3(0.0f), glm::vec3(0.0f), glm::vec3(0.0f), glm::vec3(0.0f)
             },
@@ -299,7 +299,7 @@ int main() {
                 DemoStage::INNER_PLANETS, "Mercury Fly-By", 35.0f, 6.0f,
                 "Mercury: Scorched World",
                 "The smallest and closest planet to the Sun, orbiting at high speed in a scorched, cratered environment.",
-                "Keplerian Orbital Dynamics & Dynamic Translation", "Mercury", 2.5f,
+                "Keplerian Orbital Dynamics & Dynamic Translation", "Mercury", 3.5f,
                 glm::vec3(0.38f, 0.14f, -0.15f), glm::vec3(0.34f, 0.12f, 0.0f), glm::vec3(-0.22f, 0.06f, 0.16f), glm::vec3(-0.28f, -0.02f, 0.22f),
                 glm::vec3(0.0f), glm::vec3(0.0f), glm::vec3(0.0f), glm::vec3(0.0f)
             },
@@ -308,7 +308,7 @@ int main() {
                 DemoStage::INNER_PLANETS, "Venus Fly-By", 41.0f, 6.0f,
                 "Venus: Greenhouse Hell",
                 "Earth's sister planet, shrouded in a dense, highly reflective carbon dioxide atmosphere with extreme surface heat.",
-                "Diffuse Texture Mapping & Ambient/Specular Phong Shading", "Venus", 2.2f,
+                "Diffuse Texture Mapping & Ambient/Specular Phong Shading", "Venus", 2.5f,
                 glm::vec3(0.52f, 0.18f, -0.25f), glm::vec3(0.45f, 0.15f, 0.0f), glm::vec3(-0.32f, 0.08f, 0.25f), glm::vec3(-0.40f, -0.04f, 0.32f),
                 glm::vec3(0.0f), glm::vec3(0.0f), glm::vec3(0.0f), glm::vec3(0.0f)
             },
@@ -326,7 +326,7 @@ int main() {
                 DemoStage::INNER_PLANETS, "Mars Fly-By", 53.0f, 7.0f,
                 "Mars: The Red Planet",
                 "Featuring iron-rich rusty soil, thin atmosphere, polar carbon dioxide ice caps, and ancient volcanic valleys.",
-                "Realistic Scale Factors & Specular Mapping", "Mars", 2.0f,
+                "Realistic Scale Factors & Specular Mapping", "Mars", 1.8f,
                 glm::vec3(0.50f, 0.18f, -0.22f), glm::vec3(0.42f, 0.14f, 0.0f), glm::vec3(-0.30f, 0.06f, 0.22f), glm::vec3(-0.38f, -0.04f, 0.28f),
                 glm::vec3(0.0f), glm::vec3(0.0f), glm::vec3(0.0f), glm::vec3(0.0f)
             },
@@ -335,7 +335,7 @@ int main() {
                 DemoStage::EARTH_MOON, "Earth & Moon System", 60.0f, 20.0f,
                 "Earth & Moon System",
                 "Observing the Earth and its tidally locked natural satellite, illustrating scaling and relative orbital orbits.",
-                "Relative Transformations & Dynamic Night Lights", "Earth", 1.0f,
+                "Relative Transformations & Dynamic Night Lights", "Earth", 1.5f,
                 glm::vec3(1.8f, 0.7f, -1.5f), glm::vec3(1.2f, 0.4f, -0.8f), glm::vec3(-0.8f, 0.25f, 0.9f), glm::vec3(-1.2f, 0.15f, 1.5f),
                 glm::vec3(0.0f), glm::vec3(0.0f), glm::vec3(0.0f), glm::vec3(0.0f)
             },
@@ -344,7 +344,7 @@ int main() {
                 DemoStage::SPACE_STATION, "ISS Close Fly-By", 80.0f, 20.0f,
                 "International Space Station",
                 "A modular research laboratory in low Earth orbit, assembled using hierarchical truss lines and solar panels.",
-                "Hierarchical Model Assemblies & Local Euler Rotations", "SpaceStation", 2.2f,
+                "Hierarchical Model Assemblies & Local Euler Rotations", "SpaceStation", 2.5f,
                 glm::vec3(0.25f, 0.08f, 0.0f), glm::vec3(0.0f, 0.15f, 0.25f), glm::vec3(-0.25f, 0.08f, 0.0f), glm::vec3(0.0f, 0.04f, -0.28f),
                 glm::vec3(0.0f), glm::vec3(0.0f), glm::vec3(0.0f), glm::vec3(0.0f)
             },
@@ -353,7 +353,7 @@ int main() {
                 DemoStage::SPACECRAFT, "Spacecraft Mission", 100.0f, 25.0f,
                 "Interplanetary Spacecraft",
                 "An explorer spacecraft performing a Hohmann-inspired transfer trajectory from Earth to Mars with glowing exhaust.",
-                "Tangent-based Trajectory Tracking & Follow Camera Math", "Spacecraft", 1.5f,
+                "Tangent-based Trajectory Tracking & Follow Camera Math", "Spacecraft", 1.2f,
                 glm::vec3(-0.05f, 0.03f, -0.12f), glm::vec3(-0.04f, 0.02f, -0.08f), glm::vec3(0.06f, 0.015f, 0.03f), glm::vec3(0.09f, 0.01f, 0.06f),
                 glm::vec3(0.0f), glm::vec3(0.0f), glm::vec3(0.0f, 0.0f, 0.05f), glm::vec3(0.0f, 0.0f, 0.10f)
             },
@@ -371,7 +371,7 @@ int main() {
                 DemoStage::JUPITER_SATURN, "Jupiter Fly-By", 145.0f, 10.0f,
                 "Jupiter: The Gas Giant",
                 "The largest planet in the solar system, a massive gas giant with prominent atmospheric bands and multiple moons.",
-                "Scale-Proportional Texture Coordinates & Orbit Tracing", "Jupiter", 1.0f,
+                "Scale-Proportional Texture Coordinates & Orbit Tracing", "Jupiter", 0.9f,
                 glm::vec3(1.6f, 0.6f, -1.0f), glm::vec3(1.4f, 0.4f, 0.0f), glm::vec3(-1.0f, 0.2f, 1.0f), glm::vec3(-1.2f, 0.1f, 1.4f),
                 glm::vec3(0.0f), glm::vec3(0.0f), glm::vec3(0.0f), glm::vec3(0.0f)
             },
@@ -380,7 +380,7 @@ int main() {
                 DemoStage::JUPITER_SATURN, "Saturn Fly-By", 155.0f, 10.0f,
                 "Saturn: Ring World",
                 "Sweeping down close to Saturn's spectacular rings, composed of billions of water ice particles and dust.",
-                "Custom Ring Mesh Geometry & Double-Sided Alpha Blending", "Saturn", 1.0f,
+                "Custom Ring Mesh Geometry & Double-Sided Alpha Blending", "Saturn", 0.8f,
                 glm::vec3(1.8f, 0.8f, -0.8f), glm::vec3(1.5f, 0.6f, 0.0f), glm::vec3(-1.1f, -0.05f, 1.0f), glm::vec3(-1.4f, -0.3f, 1.3f),
                 glm::vec3(0.0f), glm::vec3(0.0f), glm::vec3(0.0f), glm::vec3(0.0f)
             },
@@ -389,7 +389,7 @@ int main() {
                 DemoStage::CREDITS, "Solar System Credits", 165.0f, 15.0f,
                 "Solar System Simulation",
                 "Built using C++, Modern OpenGL, GLFW, Glad, and GLM. Thank you for watching!",
-                "Post-Processing Framebuffers, HDR Tone Mapping & Bloom", "", 1.0f,
+                "Post-Processing Framebuffers, HDR Tone Mapping & Bloom", "", 0.5f,
                 glm::vec3(0.0f, 6.0f, 16.0f), glm::vec3(0.0f, 7.5f, 18.0f), glm::vec3(0.0f, 18.0f, 32.0f), glm::vec3(0.0f, 22.0f, 38.0f),
                 glm::vec3(0.0f), glm::vec3(0.0f), glm::vec3(0.0f), glm::vec3(0.0f)
             }

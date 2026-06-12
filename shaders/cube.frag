@@ -91,6 +91,40 @@ vec3 perturbNormal(vec3 pos, vec3 normal, float scale, float strength) {
 }
 
 void main() {
+    if (planetId == -99) {
+        float dist = length(gl_PointCoord - vec2(0.5));
+        if (dist > 0.5) discard;
+
+        float isGalaxy = Normal.x;
+        float maxAlpha = Normal.y;
+        
+        float alpha = 0.0;
+        vec3 finalStarColor = Color;
+
+        float phase = TexCoords.x;
+        float twinkle = 0.75 + 0.25 * sin(time * (3.0 + phase * 7.0) + phase * 6.283);
+
+        if (isGalaxy > 0.5) {
+            // Galaxy band/nebula dust: soft radial falloff
+            float falloff = 1.0 - (dist / 0.5);
+            alpha = pow(falloff, 2.5) * maxAlpha;
+            
+            // Add a very subtle slow nebula shimmer
+            float shimmer = 0.9 + 0.1 * sin(time * 0.5 + phase * 6.283);
+            finalStarColor *= shimmer;
+        } else {
+            // Sharp star: very steep falloff to avoid cartoon dots, with a tiny glow core
+            float falloff = smoothstep(0.5, 0.0, dist);
+            alpha = pow(falloff, 4.0) * maxAlpha;
+            
+            // Star twinkle
+            finalStarColor *= twinkle;
+        }
+        
+        FragColor = vec4(finalStarColor, alpha * globalAlpha);
+        return;
+    }
+
     vec3 baseColor = useColorOverride ? colorOverride : Color;
     vec3 norm = normalize(Normal);
     float specularVal = 0.5; // Default specular strength
@@ -102,6 +136,28 @@ void main() {
         float dist = dot(coord, coord);
         if (dist > 0.25) discard;
         pointSpriteAlpha = 1.0 - smoothstep(0.15, 0.25, dist);
+    }
+
+    if (planetId == 5 && useTexture) {
+        vec2 animUV = TexCoords;
+        animUV.y += 0.003 * sin(TexCoords.y * 30.0 + time * 0.3); // band swirl
+        vec3 jupColor = texture(planetTexture, animUV).rgb;
+        // Great Red Spot:
+        float d = length(TexCoords - vec2(0.25, 0.35));
+        if (d < 0.06) {
+            float blend = 1.0 - (d / 0.06);
+            jupColor = mix(jupColor, vec3(0.7, 0.25, 0.12), 0.5 * blend);
+        }
+        if (useLighting) {
+            vec3 lightDir = normalize(lightPos - FragPos);
+            float diff = max(dot(norm, lightDir), 0.0);
+            vec3 textureAmbient = 0.03 * lightColor;
+            vec3 textureDiffuse = diff * lightColor;
+            FragColor = vec4((textureAmbient + textureDiffuse) * jupColor, globalAlpha * pointSpriteAlpha);
+        } else {
+            FragColor = vec4(jupColor, globalAlpha * pointSpriteAlpha);
+        }
+        return;
     }
 
     if (planetId == 200) {

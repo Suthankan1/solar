@@ -109,115 +109,36 @@ void main() {
     // MODE 0: Earth Surface
     // -------------------------------------------------------------
     if (earthMode == 0) {
-        // 1. Get Day Diffuse Color and Specular Value
-        vec3 dayColor;
-        float specularVal = 0.05;
+        // Day/night blend in earth.frag:
+        float sunDot = max(dot(normalize(Normal), normalize(lightPos - FragPos)), 0.0);
+        float dayFactor = smoothstep(0.0, 0.15, sunDot);
+        vec3 dayColor = texture(planetTexture, TexCoords).rgb;
+        vec3 nightColor = texture(nightTexture, TexCoords).rgb * 1.8;
+        vec3 surface = mix(nightColor, dayColor, dayFactor);
 
-        // Land/Water variables for fallback procedural city lights
-        float continentVal = 0.0;
-        float poleVal = abs(LocalPos.y);
+        // Twilight orange rim:
+        float twi = smoothstep(0.0, 0.2, sunDot) - smoothstep(0.15, 0.3, sunDot);
+        surface += vec3(0.8, 0.35, 0.05) * twi * 0.3;
 
-        if (useTexture) {
-            dayColor = texture(planetTexture, TexCoords).rgb;
-            if (useSpecularTexture) {
-                // Read from specular map (white = water/shiny, black = land/matte)
-                float specMask = texture(specularTexture, TexCoords).r;
-                specularVal = mix(0.05, 1.8, specMask);
-            } else {
-                // Ocean heuristic fallback
-                if (dayColor.b > dayColor.r * 1.2 && dayColor.b > dayColor.g * 1.1) {
-                    specularVal = 1.8;
-                } else {
-                    specularVal = 0.05;
-                }
-            }
-        } else {
-            // Procedural Earth surface fallback
-            continentVal = fbm(LocalPos * 5.0 + vec3(0.12));
-            if (poleVal > 0.83 + 0.08 * fbm(LocalPos * 10.0)) {
-                dayColor = vec3(0.96, 0.96, 0.98); // Ice cap
-                specularVal = 0.4;
-            } else if (continentVal > 0.46) {
-                float landNoise = fbm(LocalPos * 16.0);
-                dayColor = mix(vec3(0.12, 0.35, 0.1), vec3(0.38, 0.28, 0.16), landNoise);
-                if (landNoise > 0.65) {
-                    dayColor = mix(dayColor, vec3(0.9, 0.9, 0.9), (landNoise - 0.65) * 2.8);
-                }
-                specularVal = 0.05;
-                norm = perturbNormal(LocalPos, norm, 14.0, 0.035);
-                diff = dot(norm, lightDir); // Re-evaluate diffuse with perturbed normal
-            } else {
-                float depth = continentVal / 0.46;
-                dayColor = mix(vec3(0.01, 0.06, 0.22), vec3(0.04, 0.22, 0.42), depth);
-                specularVal = 1.8;
-            }
+        // Specular highlight (Oceans only)
+        if (useSpecularTexture) {
+            float specMask = texture(specularTexture, TexCoords).r;
+            float specularVal = mix(0.05, 1.8, specMask);
+            vec3 reflectDir = reflect(-lightDir, norm);
+            float shininess = 96.0;
+            float specFactor = pow(max(dot(viewDir, reflectDir), 0.0), shininess);
+            vec3 specularGlint = specularVal * specFactor * lightColor * dayFactor * attenuation;
+            surface += specularGlint;
         }
 
-        // 2. Get Night Lights Color
-        vec3 nightColor;
-        if (useNightTexture) {
-            nightColor = texture(nightTexture, TexCoords).rgb;
-            // Boost city lights slightly for cinematic bloom and HDR glow
-            nightColor *= 2.0;
-        } else {
-            // Procedural city lights fallback
-            float cityGlow = 0.0;
-            if (useTexture) {
-                // Using day map colors to estimate land areas (low saturation, low blue value)
-                bool isOcean = (dayColor.b > dayColor.r * 1.15 && dayColor.b > dayColor.g * 1.05);
-                if (!isOcean && dayColor.r > 0.05 && poleVal < 0.83) {
-                    float cityNoise = fbm(LocalPos * 48.0);
-                    cityGlow = smoothstep(0.68, 0.88, cityNoise) * 0.95;
-                }
-            } else {
-                if (continentVal > 0.46 && poleVal < 0.83) {
-                    float cityNoise = fbm(LocalPos * 48.0);
-                    cityGlow = smoothstep(0.68, 0.88, cityNoise) * 0.95;
-                }
-            }
-            nightColor = vec3(1.0, 0.75, 0.38) * cityGlow * 2.5;
-        }
-
-        // 3. Day / Night Blending at the Terminator
-        // Blending window: diff in [-0.12, 0.12]
-        float dayWeight = smoothstep(-0.12, 0.12, diff);
-
-        // Lit side color (Diffuse lighting + Ambient)
-        vec3 diffuseColor = max(diff, 0.0) * lightColor;
-        vec3 litSurface = (ambient + diffuseColor * attenuation) * dayColor;
-
-        // Dark side color (Unlit/Ambient + city lights)
-        // City lights only show on the dark side, so we multiply them by (1.0 - dayWeight)
-        vec3 darkSurface = ambient * dayColor * 0.2 + nightColor * (1.0 - dayWeight);
-
-        // Blend Day and Night surface colors
-        vec3 finalColor = mix(darkSurface, litSurface, dayWeight);
-
-        // 4. Sunset/Sunrise Twilight Band (Atmosphere scattering at terminator)
-        // Cosine angle between normal and light direction represents the terminator when close to 0.0
-        // We create an atmospheric scattering band peaking at diff = 0.03 (slightly into the light side)
-        float twilightFactor = smoothstep(0.20, 0.0, abs(diff - 0.03));
-        vec3 sunsetGlowColor = vec3(1.0, 0.42, 0.08); // Hot orange/red sunset color
-        vec3 sunsetGlow = sunsetGlowColor * twilightFactor * 1.8 * attenuation;
-        
-        // Land/Water sunset modulation: sunset is visible on land & clouds (gives gorgeous rim color)
-        finalColor += sunsetGlow * (1.0 - specularVal * 0.4) * dayWeight;
-
-        // 5. Specular highlight (Oceans only)
-        vec3 reflectDir = reflect(-lightDir, norm);
-        float shininess = 96.0;
-        float specFactor = pow(max(dot(viewDir, reflectDir), 0.0), shininess);
-        vec3 specularGlint = specularVal * specFactor * lightColor * dayWeight * attenuation;
-        finalColor += specularGlint;
-
-        // 6. Atmospheric Rim Glow (blue scattering at the Earth limb)
+        // Atmospheric Rim Glow (blue scattering at the Earth limb)
         float rimDot = max(dot(normalize(viewDir), normalize(Normal)), 0.0);
         float rim = 1.0 - rimDot;
         vec3 atmosBlue = vec3(0.25, 0.55, 1.0) * pow(rim, 3.0) * 2.0;
         vec3 oxyGreen = vec3(0.30, 1.00, 0.4) * step(0.92, rim) * 0.4 * (rim - 0.92) / 0.08;
-        finalColor += atmosBlue + oxyGreen;
+        surface += atmosBlue + oxyGreen;
 
-        FragColor = vec4(finalColor, globalAlpha);
+        FragColor = vec4(surface, globalAlpha);
         return;
     }
 

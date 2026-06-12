@@ -65,6 +65,10 @@ public:
     void beginFrame();
     void endFrame(bool bloomEnabled, float vignetteStrength = 0.0f);
 
+    // Frustum culling functions
+    void updateFrustumPlanes(const glm::mat4& pvp);
+    bool sphereInFrustum(glm::vec3 center, float radius);
+
     // Static shape generators to support modern OpenGL data management
     static Mesh createSphere(float radius, unsigned int rings, unsigned int sectors);
     static Mesh createRing(float radius, unsigned int segments);
@@ -73,6 +77,7 @@ public:
     void cleanup();
 
 private:
+    glm::vec4 m_frustumPlanes[6];
     std::unique_ptr<Shader> m_shader;
     std::unique_ptr<Shader> m_earthShader;
     std::unique_ptr<Mesh> m_sphereMesh;

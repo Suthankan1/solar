@@ -72,9 +72,13 @@ void SceneManager::render(Renderer& renderer) {
             aspect = static_cast<float>(viewport[2]) / static_cast<float>(viewport[3]);
         }
 
-        renderer.setViewMatrix(m_activeCamera->getViewMatrix());
-        renderer.setProjectionMatrix(m_activeCamera->getProjectionMatrix(aspect));
+        glm::mat4 view = m_activeCamera->getViewMatrix();
+        glm::mat4 proj = m_activeCamera->getProjectionMatrix(aspect);
+
+        renderer.setViewMatrix(view);
+        renderer.setProjectionMatrix(proj);
         renderer.setCameraPosition(m_activeCamera->getPosition());
+        renderer.updateFrustumPlanes(proj * view);
     }
 
     for (auto& object : m_objects) {

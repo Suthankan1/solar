@@ -227,6 +227,69 @@ void Renderer::endFrame(bool bloomEnabled, float vignetteStrength) {
     }
 }
 
+void Renderer::updateFrustumPlanes(const glm::mat4& pvp) {
+    // Left plane
+    m_frustumPlanes[0] = glm::vec4(
+        pvp[0][3] + pvp[0][0],
+        pvp[1][3] + pvp[1][0],
+        pvp[2][3] + pvp[2][0],
+        pvp[3][3] + pvp[3][0]
+    );
+    // Right plane
+    m_frustumPlanes[1] = glm::vec4(
+        pvp[0][3] - pvp[0][0],
+        pvp[1][3] - pvp[1][0],
+        pvp[2][3] - pvp[2][0],
+        pvp[3][3] - pvp[3][0]
+    );
+    // Bottom plane
+    m_frustumPlanes[2] = glm::vec4(
+        pvp[0][3] + pvp[0][1],
+        pvp[1][3] + pvp[1][1],
+        pvp[2][3] + pvp[2][1],
+        pvp[3][3] + pvp[3][1]
+    );
+    // Top plane
+    m_frustumPlanes[3] = glm::vec4(
+        pvp[0][3] - pvp[0][1],
+        pvp[1][3] - pvp[1][1],
+        pvp[2][3] - pvp[2][1],
+        pvp[3][3] - pvp[3][1]
+    );
+    // Near plane
+    m_frustumPlanes[4] = glm::vec4(
+        pvp[0][3] + pvp[0][2],
+        pvp[1][3] + pvp[1][2],
+        pvp[2][3] + pvp[2][2],
+        pvp[3][3] + pvp[3][2]
+    );
+    // Far plane
+    m_frustumPlanes[5] = glm::vec4(
+        pvp[0][3] - pvp[0][2],
+        pvp[1][3] - pvp[1][2],
+        pvp[2][3] - pvp[2][2],
+        pvp[3][3] - pvp[3][2]
+    );
+
+    // Normalize planes
+    for (int i = 0; i < 6; ++i) {
+        float length = glm::length(glm::vec3(m_frustumPlanes[i]));
+        if (length > 0.0f) {
+            m_frustumPlanes[i] /= length;
+        }
+    }
+}
+
+bool Renderer::sphereInFrustum(glm::vec3 center, float radius) {
+    for (int i = 0; i < 6; ++i) {
+        float dist = glm::dot(glm::vec3(m_frustumPlanes[i]), center) + m_frustumPlanes[i].w;
+        if (dist < -radius) {
+            return false;
+        }
+    }
+    return true;
+}
+
 void Renderer::createFBOs(int width, int height) {
     // Avoid rebuilding if dimensions haven't changed
     if (m_fboWidth == width && m_fboHeight == height) return;

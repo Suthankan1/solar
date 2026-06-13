@@ -40,7 +40,7 @@ void AtmosphereLayer::render(Renderer& renderer) {
 
         shader.setInt("earthMode", 2); // Mode 2: Atmosphere rendering
 
-        renderer.renderWithLighting(renderer.getSphereMesh(), shader, model);
+        renderer.renderWithLighting(renderer.getSphereMeshForRadius(m_transform.getScale().x, glm::distance(renderer.getCameraPosition(), m_transform.getPosition())), shader, model);
     } else {
         const Shader& shader = renderer.getShader();
         shader.use();
@@ -50,7 +50,7 @@ void AtmosphereLayer::render(Renderer& renderer) {
         shader.setBool("useColorOverride", true);
         shader.setVec3("colorOverride", m_color);
 
-        renderer.renderWithLighting(renderer.getSphereMesh(), shader, model);
+        renderer.renderWithLighting(renderer.getSphereMeshForRadius(m_transform.getScale().x, glm::distance(renderer.getCameraPosition(), m_transform.getPosition())), shader, model);
 
         shader.setBool("useColorOverride", false);
     }

@@ -1,4 +1,5 @@
 #include "celestial/Planet.h"
+#include "celestial/OrbitMath.h"
 #include "core/Renderer.h"
 #include <glm/gtc/matrix_transform.hpp>
 #include <cmath>
@@ -42,31 +43,22 @@ void Planet::update(float deltaTime) {
     m_orbitAngle += m_orbitSpeed * deltaTime;
     m_rotationAngle += m_rotationSpeed * deltaTime;
 
-    // Calculate 3D position in the XZ plane, tilted and rotated
-    float theta = m_orbitAngle;
-    float iRad = glm::radians(m_inclination);
-    float omegaRad = glm::radians(m_longitudeOfAscendingNode);
-
-    // 1. Position in orbital plane
-    float x0 = m_semiMajorAxis * std::cos(theta);
-    float z0 = m_semiMinorAxis * std::sin(theta);
-
-    // 2. Inclination (rotate around X-axis by inclination angle)
-    float x1 = x0;
-    float y1 = -z0 * std::sin(iRad);
-    float z1 = z0 * std::cos(iRad);
-
-    // 3. Longitude of ascending node (rotate around Y-axis)
-    glm::vec3 position;
-    position.x = x1 * std::cos(omegaRad) - z1 * std::sin(omegaRad);
-    position.y = y1;
-    position.z = x1 * std::sin(omegaRad) + z1 * std::cos(omegaRad);
-
-    m_transform.setPosition(position);
+    m_transform.setPosition(calculateOrbitPosition(
+        m_semiMajorAxis,
+        m_semiMinorAxis,
+        m_inclination,
+        m_longitudeOfAscendingNode,
+        m_orbitAngle
+    ));
     m_transform.setRotation(glm::vec3(0.0f, m_rotationAngle, 0.0f));
 }
 
 void Planet::render(Renderer& renderer) {
+    const float cameraDistance = glm::distance(renderer.getCameraPosition(), getPosition());
+    if (!renderer.sphereInFrustum(getPosition(), getRadius() * 1.75f)) {
+        return;
+    }
+
     float tiltDeg = 0.0f;
     if (m_name == "Earth") tiltDeg = 23.4f;
     else if (m_name == "Mars") tiltDeg = 25.2f;
@@ -115,7 +107,7 @@ void Planet::render(Renderer& renderer) {
         }
 
         // Earth is lit by the central star
-        renderer.renderWithLighting(renderer.getSphereMesh(), shader, model);
+        renderer.renderWithLighting(renderer.getSphereMeshForRadius(getRadius(), cameraDistance), shader, model);
 
         // Unbind to prevent state bleed
         if (hasTexture) m_texture->unbind();
@@ -149,7 +141,7 @@ void Planet::render(Renderer& renderer) {
         shader.setInt("planetId", planetId);
 
         // Planets are lit by the central star
-        renderer.renderWithLighting(renderer.getSphereMesh(), shader, model);
+        renderer.renderWithLighting(renderer.getSphereMeshForRadius(getRadius(), cameraDistance), shader, model);
 
         shader.setBool("useColorOverride", false);
         if (hasTexture) {

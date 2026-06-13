@@ -4,8 +4,9 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <vector>
 #include <iostream>
+#include <iterator>
 
-TextRenderer::TextRenderer() : m_VAO(0), m_VBO(0), m_textureID(0) {}
+TextRenderer::TextRenderer() : m_VAO(0), m_VBO(0), m_textureID(0), m_vboCapacityBytes(0) {}
 
 TextRenderer::~TextRenderer() {
     if (m_VAO) glDeleteVertexArrays(1, &m_VAO);
@@ -53,7 +54,8 @@ bool TextRenderer::init() {
     glGenBuffers(1, &m_VBO);
     glBindVertexArray(m_VAO);
     glBindBuffer(GL_ARRAY_BUFFER, m_VBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(float) * 6 * 4, nullptr, GL_DYNAMIC_DRAW);
+    m_vboCapacityBytes = sizeof(float) * 6 * 4 * 128;
+    glBufferData(GL_ARRAY_BUFFER, m_vboCapacityBytes, nullptr, GL_DYNAMIC_DRAW);
     
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float), nullptr);
@@ -67,13 +69,16 @@ bool TextRenderer::init() {
 
 void TextRenderer::renderText(const std::string& text, float x, float y, float scale, const glm::vec4& color, int screenWidth, int screenHeight) {
     if (!m_shader || m_VAO == 0 || m_VBO == 0 || m_textureID == 0) return;
+    if (text.empty()) return;
 
     // Save current OpenGL states to prevent altering main scene rendering pipeline
     GLboolean depthTestEnabled = glIsEnabled(GL_DEPTH_TEST);
     GLboolean blendEnabled = glIsEnabled(GL_BLEND);
-    GLint blendSrc, blendDst;
-    glGetIntegerv(GL_BLEND_SRC_ALPHA, &blendSrc);
-    glGetIntegerv(GL_BLEND_DST_ALPHA, &blendDst);
+    GLint blendSrcRgb, blendDstRgb, blendSrcAlpha, blendDstAlpha;
+    glGetIntegerv(GL_BLEND_SRC_RGB, &blendSrcRgb);
+    glGetIntegerv(GL_BLEND_DST_RGB, &blendDstRgb);
+    glGetIntegerv(GL_BLEND_SRC_ALPHA, &blendSrcAlpha);
+    glGetIntegerv(GL_BLEND_DST_ALPHA, &blendDstAlpha);
 
     // Configure states for 2D UI overlay text rendering
     glDisable(GL_DEPTH_TEST);
@@ -93,75 +98,51 @@ void TextRenderer::renderText(const std::string& text, float x, float y, float s
     glBindVertexArray(m_VAO);
     glBindBuffer(GL_ARRAY_BUFFER, m_VBO);
 
-    // Draw shadow first
-    float shadowOffset = 1.0f * scale;
-    m_shader->setVec4("textColor", glm::vec4(0.0f, 0.0f, 0.0f, color.a));
-    float currentX = x + shadowOffset;
-    float shadowY = y - shadowOffset;
-    for (char c : text) {
-        int charIdx = static_cast<unsigned char>(c);
-        if (charIdx < 0 || charIdx >= 128) {
-            charIdx = 32; // Default to space
+    std::vector<float> vertices;
+    vertices.reserve(text.size() * 6 * 4);
+    auto appendStringVertices = [&](float startX, float baselineY) {
+        float currentX = startX;
+        const float w = 8.0f * scale;
+        const float h = 8.0f * scale;
+
+        for (char c : text) {
+            int charIdx = static_cast<unsigned char>(c);
+            if (charIdx < 0 || charIdx >= 128) {
+                charIdx = 32;
+            }
+
+            const float u0 = (charIdx * 8.0f) / 1024.0f;
+            const float u1 = (charIdx * 8.0f + 8.0f) / 1024.0f;
+            const float quad[] = {
+                currentX,     baselineY + h, u0, 1.0f,
+                currentX,     baselineY,     u0, 0.0f,
+                currentX + w, baselineY,     u1, 0.0f,
+                currentX,     baselineY + h, u0, 1.0f,
+                currentX + w, baselineY,     u1, 0.0f,
+                currentX + w, baselineY + h, u1, 1.0f
+            };
+            vertices.insert(vertices.end(), std::begin(quad), std::end(quad));
+            currentX += w;
         }
+    };
 
-        // Texture atlas coordinates: width is 1024, each glyph spans 8 pixels
-        float u0 = (charIdx * 8.0f) / 1024.0f;
-        float u1 = (charIdx * 8.0f + 8.0f) / 1024.0f;
-
-        float w = 8.0f * scale;
-        float h = 8.0f * scale;
-
-        // Triangles quad representation: position.xy, texcoords.zw
-        float vertices[6][4] = {
-            { currentX,     shadowY + h,   u0, 1.0f },
-            { currentX,     shadowY,       u0, 0.0f },
-            { currentX + w, shadowY,       u1, 0.0f },
-
-            { currentX,     shadowY + h,   u0, 1.0f },
-            { currentX + w, shadowY,       u1, 0.0f },
-            { currentX + w, shadowY + h,   u1, 1.0f }
-        };
-
-        glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vertices), vertices);
-        glDrawArrays(GL_TRIANGLES, 0, 6);
-
-        // Advance cursor position
-        currentX += w;
-    }
-
-    // Now draw colored text on top
-    m_shader->setVec4("textColor", color);
-    currentX = x;
-    for (char c : text) {
-        int charIdx = static_cast<unsigned char>(c);
-        if (charIdx < 0 || charIdx >= 128) {
-            charIdx = 32; // Default to space
+    auto drawBatch = [&](const glm::vec4& batchColor) {
+        const std::size_t bytes = vertices.size() * sizeof(float);
+        if (bytes > m_vboCapacityBytes) {
+            m_vboCapacityBytes = bytes;
+            glBufferData(GL_ARRAY_BUFFER, m_vboCapacityBytes, nullptr, GL_DYNAMIC_DRAW);
         }
+        glBufferSubData(GL_ARRAY_BUFFER, 0, bytes, vertices.data());
+        m_shader->setVec4("textColor", batchColor);
+        glDrawArrays(GL_TRIANGLES, 0, static_cast<GLsizei>(vertices.size() / 4));
+    };
 
-        // Texture atlas coordinates: width is 1024, each glyph spans 8 pixels
-        float u0 = (charIdx * 8.0f) / 1024.0f;
-        float u1 = (charIdx * 8.0f + 8.0f) / 1024.0f;
+    appendStringVertices(x + 1.0f * scale, y - 1.0f * scale);
+    drawBatch(glm::vec4(0.0f, 0.0f, 0.0f, color.a));
 
-        float w = 8.0f * scale;
-        float h = 8.0f * scale;
-
-        // Triangles quad representation: position.xy, texcoords.zw
-        float vertices[6][4] = {
-            { currentX,     y + h,   u0, 1.0f },
-            { currentX,     y,       u0, 0.0f },
-            { currentX + w, y,       u1, 0.0f },
-
-            { currentX,     y + h,   u0, 1.0f },
-            { currentX + w, y,       u1, 0.0f },
-            { currentX + w, y + h,   u1, 1.0f }
-        };
-
-        glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vertices), vertices);
-        glDrawArrays(GL_TRIANGLES, 0, 6);
-
-        // Advance cursor position
-        currentX += w;
-    }
+    vertices.clear();
+    appendStringVertices(x, y);
+    drawBatch(color);
 
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
@@ -179,7 +160,7 @@ void TextRenderer::renderText(const std::string& text, float x, float y, float s
     } else {
         glDisable(GL_BLEND);
     }
-    glBlendFunc(blendSrc, blendDst);
+    glBlendFuncSeparate(blendSrcRgb, blendDstRgb, blendSrcAlpha, blendDstAlpha);
 }
 
 void TextRenderer::renderQuad(float x, float y, float w, float h, const glm::vec4& color, int screenWidth, int screenHeight) {
@@ -187,9 +168,11 @@ void TextRenderer::renderQuad(float x, float y, float w, float h, const glm::vec
 
     GLboolean depthTestEnabled = glIsEnabled(GL_DEPTH_TEST);
     GLboolean blendEnabled = glIsEnabled(GL_BLEND);
-    GLint blendSrc, blendDst;
-    glGetIntegerv(GL_BLEND_SRC_ALPHA, &blendSrc);
-    glGetIntegerv(GL_BLEND_DST_ALPHA, &blendDst);
+    GLint blendSrcRgb, blendDstRgb, blendSrcAlpha, blendDstAlpha;
+    glGetIntegerv(GL_BLEND_SRC_RGB, &blendSrcRgb);
+    glGetIntegerv(GL_BLEND_DST_RGB, &blendDstRgb);
+    glGetIntegerv(GL_BLEND_SRC_ALPHA, &blendSrcAlpha);
+    glGetIntegerv(GL_BLEND_DST_ALPHA, &blendDstAlpha);
 
     glDisable(GL_DEPTH_TEST);
     glEnable(GL_BLEND);
@@ -234,5 +217,5 @@ void TextRenderer::renderQuad(float x, float y, float w, float h, const glm::vec
     
     if (blendEnabled) glEnable(GL_BLEND);
     else glDisable(GL_BLEND);
-    glBlendFunc(blendSrc, blendDst);
+    glBlendFuncSeparate(blendSrcRgb, blendDstRgb, blendSrcAlpha, blendDstAlpha);
 }

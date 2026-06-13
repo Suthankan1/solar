@@ -1,4 +1,5 @@
 #include "core/Renderer.h"
+#include "celestial/OrbitMath.h"
 #include <GLFW/glfw3.h>
 #include <iostream>
 #include <cmath>
@@ -9,7 +10,9 @@
 Renderer::Renderer()
     : m_shader(nullptr),
       m_earthShader(nullptr),
-      m_sphereMesh(nullptr),
+      m_sphereMeshLow(nullptr),
+      m_sphereMeshMedium(nullptr),
+      m_sphereMeshHigh(nullptr),
       m_lightPosition(0.0f),
       m_lightColor(2.2f, 2.0f, 1.7f),
       m_lightConstant(1.0f),
@@ -40,7 +43,9 @@ bool Renderer::init() {
 
     // 2. Initialize default meshes for testing and demonstration
     try {
-        m_sphereMesh = std::make_unique<Mesh>(createSphere(0.6f, 64, 64));
+        m_sphereMeshLow = std::make_unique<Mesh>(createSphere(0.6f, 16, 16));
+        m_sphereMeshMedium = std::make_unique<Mesh>(createSphere(0.6f, 32, 32));
+        m_sphereMeshHigh = std::make_unique<Mesh>(createSphere(0.6f, 64, 64));
     } catch (const std::exception& e) {
         std::cerr << "Renderer Init Error: Failed to generate default meshes:\n" << e.what() << std::endl;
         return false;
@@ -120,8 +125,40 @@ void Renderer::renderWithLighting(const Mesh& mesh, const Shader& shader, const 
     renderWithLighting(mesh, shader, model, m_viewMatrix, m_projMatrix, m_lightPosition, m_lightColor, m_cameraPosition);
 }
 
+const Mesh& Renderer::getSphereMesh() const {
+    return m_highQualitySpheres ? *m_sphereMeshHigh : *m_sphereMeshMedium;
+}
+
+const Mesh& Renderer::getSphereMesh(SphereMeshQuality quality) const {
+    switch (quality) {
+        case SphereMeshQuality::Low:
+            return *m_sphereMeshLow;
+        case SphereMeshQuality::Medium:
+            return *m_sphereMeshMedium;
+        case SphereMeshQuality::High:
+        default:
+            return *m_sphereMeshHigh;
+    }
+}
+
+const Mesh& Renderer::getSphereMeshForRadius(float radius, float cameraDistance) const {
+    if (!m_highQualitySpheres) {
+        return *m_sphereMeshLow;
+    }
+
+    if (radius < 0.18f || cameraDistance > 18.0f) {
+        return *m_sphereMeshLow;
+    }
+    if (radius < 0.45f || cameraDistance > 10.0f) {
+        return *m_sphereMeshMedium;
+    }
+    return *m_sphereMeshHigh;
+}
+
 void Renderer::cleanup() {
-    m_sphereMesh.reset();
+    m_sphereMeshLow.reset();
+    m_sphereMeshMedium.reset();
+    m_sphereMeshHigh.reset();
     m_shader.reset();
     m_earthShader.reset();
     m_bloomShader.reset();
@@ -179,7 +216,7 @@ void Renderer::endFrame(bool bloomEnabled, float vignetteStrength) {
 
     int lastWrittenTextureIdx = 0;
     bool horizontal = true, firstPass = true;
-    unsigned int amount = 6; // 3 full horizontal/vertical iterations on downsampled bloom buffers
+    unsigned int amount = m_bloomBlurPasses;
 
     if (bloomEnabled && m_blurShader) {
         m_blurShader->use();
@@ -216,7 +253,7 @@ void Renderer::endFrame(bool bloomEnabled, float vignetteStrength) {
         m_bloomShader->setInt("scene", 0);
         
         glActiveTexture(GL_TEXTURE1);
-        glBindTexture(GL_TEXTURE_2D, m_pingpongColorBuffers[lastWrittenTextureIdx]);
+        glBindTexture(GL_TEXTURE_2D, (bloomEnabled && amount > 0) ? m_pingpongColorBuffers[lastWrittenTextureIdx] : 0);
         m_bloomShader->setInt("bloomBlur", 1);
         
         m_bloomShader->setBool("bloom", bloomEnabled);
@@ -321,8 +358,8 @@ void Renderer::createFBOs(int width, int height) {
 
     m_fboWidth = width;
     m_fboHeight = height;
-    m_blurWidth = std::max(1, width / 2);
-    m_blurHeight = std::max(1, height / 2);
+    m_blurWidth = std::max(1, width / 4);
+    m_blurHeight = std::max(1, height / 4);
 
     // Create HDR Framebuffer
     glGenFramebuffers(1, &m_hdrFBO);
@@ -479,35 +516,72 @@ Mesh Renderer::createEllipticalRing(float semiMajor, float semiMinor, float incl
     std::vector<unsigned int> indices;
 
     const float PI = 3.14159265359f;
-    float iRad = glm::radians(inclinationDeg);
-    float omegaRad = glm::radians(longitudeOfAscendingNodeDeg);
+    segments = std::max(segments, 96u);
+    const unsigned int tubeSides = 8;
+    const float maxAxis = std::max(semiMajor, semiMinor);
+    const float tubeRadius = std::clamp(maxAxis * 0.0018f, 0.006f, 0.026f);
+    const glm::vec3 planeNormal = calculateOrbitPlaneNormal(inclinationDeg, longitudeOfAscendingNodeDeg);
+
+    vertices.reserve(segments * tubeSides);
+    indices.reserve(segments * tubeSides * 6);
 
     for (unsigned int i = 0; i < segments; ++i) {
-        float theta = 2.0f * PI * (float)i / (float)segments;
+        const float theta = 2.0f * PI * static_cast<float>(i) / static_cast<float>(segments);
+        const float prevTheta = 2.0f * PI * static_cast<float>((i + segments - 1) % segments) / static_cast<float>(segments);
+        const float nextTheta = 2.0f * PI * static_cast<float>((i + 1) % segments) / static_cast<float>(segments);
 
-        // 1. Position in the orbital plane
-        float x0 = semiMajor * std::cos(theta);
-        float z0 = semiMinor * std::sin(theta);
+        // The tube center uses the same transform as Planet::update().
+        const glm::vec3 center = calculateOrbitPosition(semiMajor, semiMinor, inclinationDeg, longitudeOfAscendingNodeDeg, theta);
+        const glm::vec3 prev = calculateOrbitPosition(semiMajor, semiMinor, inclinationDeg, longitudeOfAscendingNodeDeg, prevTheta);
+        const glm::vec3 next = calculateOrbitPosition(semiMajor, semiMinor, inclinationDeg, longitudeOfAscendingNodeDeg, nextTheta);
 
-        // 2. Inclination (rotate around X-axis by inclination angle)
-        float x1 = x0;
-        float y1 = -z0 * std::sin(iRad);
-        float z1 = z0 * std::cos(iRad);
+        glm::vec3 tangent = next - prev;
+        if (glm::length(tangent) < 0.0001f) {
+            tangent = glm::vec3(1.0f, 0.0f, 0.0f);
+        } else {
+            tangent = glm::normalize(tangent);
+        }
 
-        // 3. Longitude of ascending node (rotate around Y-axis)
-        float xFinal = x1 * std::cos(omegaRad) - z1 * std::sin(omegaRad);
-        float yFinal = y1;
-        float zFinal = x1 * std::sin(omegaRad) + z1 * std::cos(omegaRad);
+        glm::vec3 radial = glm::cross(tangent, planeNormal);
+        if (glm::length(radial) < 0.0001f) {
+            radial = glm::normalize(center);
+        } else {
+            radial = glm::normalize(radial);
+        }
 
-        Vertex vertex;
-        vertex.position = glm::vec3(xFinal, yFinal, zFinal);
-        vertex.normal = glm::vec3(0.0f, 1.0f, 0.0f);
-        vertex.color = glm::vec3(1.0f, 1.0f, 1.0f);
-        vertex.texCoords = glm::vec2((float)i / segments, 0.0f);
+        for (unsigned int side = 0; side < tubeSides; ++side) {
+            const float phi = 2.0f * PI * static_cast<float>(side) / static_cast<float>(tubeSides);
+            const glm::vec3 tubeNormal = glm::normalize(std::cos(phi) * planeNormal + std::sin(phi) * radial);
 
-        vertices.push_back(vertex);
-        indices.push_back(i);
+            Vertex vertex;
+            vertex.position = center + tubeNormal * tubeRadius;
+            vertex.normal = tubeNormal;
+            vertex.color = glm::vec3(1.0f);
+            vertex.texCoords = glm::vec2(static_cast<float>(i) / static_cast<float>(segments),
+                                         static_cast<float>(side) / static_cast<float>(tubeSides));
+
+            vertices.push_back(vertex);
+        }
     }
 
-    return Mesh(vertices, indices, GL_LINE_LOOP);
+    for (unsigned int i = 0; i < segments; ++i) {
+        const unsigned int nextI = (i + 1) % segments;
+        for (unsigned int side = 0; side < tubeSides; ++side) {
+            const unsigned int nextSide = (side + 1) % tubeSides;
+            const unsigned int a = i * tubeSides + side;
+            const unsigned int b = nextI * tubeSides + side;
+            const unsigned int c = nextI * tubeSides + nextSide;
+            const unsigned int d = i * tubeSides + nextSide;
+
+            indices.push_back(a);
+            indices.push_back(b);
+            indices.push_back(c);
+
+            indices.push_back(a);
+            indices.push_back(c);
+            indices.push_back(d);
+        }
+    }
+
+    return Mesh(vertices, indices);
 }

@@ -18,6 +18,8 @@ public:
     void swapBuffers();
     void pollEvents();
     void setTitle(const std::string& title);
+    void setVSync(bool enabled);
+    bool isVSyncEnabled() const { return m_vsyncEnabled; }
 
     GLFWwindow* getGLFWWindow() const { return m_window; }
     int getWidth() const { return m_width; }
@@ -40,6 +42,7 @@ private:
     double m_mouseDeltaY;
     double m_scrollDeltaY;
     bool m_firstMouse;
+    bool m_vsyncEnabled;
 
     static void framebufferSizeCallback(GLFWwindow* window, int width, int height);
     static void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods);

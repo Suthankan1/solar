@@ -3,14 +3,14 @@
 #include "core/Shader.h"
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
-#include <cstdlib>
 #include <cmath>
 #include <vector>
 #include <memory>
+#include <algorithm>
 #include <glm/gtc/matrix_transform.hpp>
 
 AsteroidBelt::AsteroidBelt(const std::string& name, float innerRadius, float outerRadius, unsigned int count)
-    : SceneObject(name), m_count(kAsteroidCount) {
+    : SceneObject(name), m_count(kAsteroidCount), m_activeCount(kAsteroidCount), m_quality(Quality::High) {
     (void)count;
     
     // 1. Compile the custom instanced asteroid shader using existing cube.frag
@@ -84,14 +84,28 @@ AsteroidBelt::AsteroidBelt(const std::string& name, float innerRadius, float out
     };
     const float heroInitialAngles[] = {0.35f * PI, 1.15f * PI, 1.75f * PI};
 
-    auto rand01 = []() {
-        return static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX);
+    struct BeltRNG {
+        unsigned int state;
+        BeltRNG(unsigned int seed) : state(seed) {}
+        float nextFloat() {
+            state = state * 1664525u + 1013904223u;
+            return static_cast<float>(state) / 4294967296.0f;
+        }
+        unsigned int nextIndex(unsigned int maxExclusive) {
+            return maxExclusive == 0 ? 0 : static_cast<unsigned int>(nextFloat() * maxExclusive) % maxExclusive;
+        }
+    };
+    BeltRNG beltRng(987654u);
+    auto rand01 = [&beltRng]() {
+        return beltRng.nextFloat();
     };
 
     m_heroMesh = std::make_unique<Mesh>(Renderer::createSphere(0.04f, 8, 8));
+    m_heroRadii.reserve(3);
     m_heroPositions.reserve(3);
     m_heroAngles.reserve(3);
     for (int i = 0; i < 3; ++i) {
+        m_heroRadii.push_back(heroRadii[i]);
         m_heroAngles.push_back(heroInitialAngles[i]);
         m_heroPositions.emplace_back(
             std::cos(heroInitialAngles[i]) * heroRadii[i],
@@ -161,7 +175,7 @@ AsteroidBelt::AsteroidBelt(const std::string& name, float innerRadius, float out
         }
 
         // Assign to one of the 5 base meshes randomly
-        a.meshIndex = std::rand() % m_baseMeshes.size();
+        a.meshIndex = beltRng.nextIndex(static_cast<unsigned int>(m_baseMeshes.size()));
 
         m_asteroids.push_back(a);
     }
@@ -170,6 +184,22 @@ AsteroidBelt::AsteroidBelt(const std::string& name, float innerRadius, float out
 AsteroidBelt::~AsteroidBelt() {
     if (!m_instanceVBOs.empty()) {
         glDeleteBuffers(static_cast<GLsizei>(m_instanceVBOs.size()), m_instanceVBOs.data());
+    }
+}
+
+void AsteroidBelt::setQuality(Quality quality) {
+    m_quality = quality;
+    switch (m_quality) {
+        case Quality::Low:
+            m_activeCount = 260;
+            break;
+        case Quality::Medium:
+            m_activeCount = 520;
+            break;
+        case Quality::High:
+        default:
+            m_activeCount = m_count;
+            break;
     }
 }
 
@@ -300,7 +330,8 @@ void AsteroidBelt::update(float deltaTime) {
     }
 
     // Update individual physics states and build model matrices
-    for (size_t i = 0; i < m_asteroids.size(); ++i) {
+    const size_t activeCount = std::min(static_cast<size_t>(m_activeCount), m_asteroids.size());
+    for (size_t i = 0; i < activeCount; ++i) {
         auto& asteroid = m_asteroids[i];
 
         // Orbit revolution
@@ -325,14 +356,14 @@ void AsteroidBelt::update(float deltaTime) {
         m_instanceDataPerMesh[asteroid.meshIndex].push_back(data);
     }
 
-    const float heroRadii[] = {5.8f, 6.1f, 6.4f};
     for (size_t i = 0; i < m_heroPositions.size(); ++i) {
-        const float heroSpeed = 0.7f * std::sqrt(5.0f / heroRadii[i]) * 0.6f;
+        const float heroRadius = i < m_heroRadii.size() ? m_heroRadii[i] : 7.7f;
+        const float heroSpeed = 0.7f * std::sqrt(5.0f / heroRadius) * 0.6f;
         m_heroAngles[i] += heroSpeed * deltaTime;
         m_heroPositions[i] = glm::vec3(
-            std::cos(m_heroAngles[i]) * heroRadii[i],
+            std::cos(m_heroAngles[i]) * heroRadius,
             0.0f,
-            std::sin(m_heroAngles[i]) * heroRadii[i]
+            std::sin(m_heroAngles[i]) * heroRadius
         );
     }
 

@@ -2,6 +2,7 @@
 #include "celestial/Planet.h"
 #include "core/Renderer.h"
 #include "core/Shader.h"
+#include <glad/glad.h>
 #include <glm/common.hpp>
 #include <glm/geometric.hpp>
 
@@ -9,9 +10,9 @@ SaturnRings::SaturnRings(const std::string& name, std::shared_ptr<Planet> parent
     : SceneObject(name), m_parent(parent) {
     if (m_parent) {
         float parentRadius = m_parent->getRadius();
-        m_innerRing = std::make_unique<Mesh>(Renderer::createRing(parentRadius * 1.4f, 128));
-        m_middleRing = std::make_unique<Mesh>(Renderer::createRing(parentRadius * 1.8f, 128));
-        m_outerRing = std::make_unique<Mesh>(Renderer::createRing(parentRadius * 2.3f, 128));
+        m_innerRing = std::make_unique<Mesh>(Renderer::createRing(parentRadius * kInnerRadiusMultiplier, 128));
+        m_middleRing = std::make_unique<Mesh>(Renderer::createRing(parentRadius * kMiddleRadiusMultiplier, 128));
+        m_outerRing = std::make_unique<Mesh>(Renderer::createRing(parentRadius * kOuterRadiusMultiplier, 128));
     }
 }
 
@@ -36,6 +37,13 @@ void SaturnRings::render(Renderer& renderer) {
     shader.use();
     shader.setBool("useColorOverride", true);
 
+    const GLboolean blendWasEnabled = glIsEnabled(GL_BLEND);
+    GLboolean depthWriteWasEnabled = GL_TRUE;
+    glGetBooleanv(GL_DEPTH_WRITEMASK, &depthWriteWasEnabled);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glDepthMask(GL_FALSE);
+
     auto renderRingBand = [&](const Mesh& ring, const glm::vec3& color) {
         shader.setInt("planetId", 106);
         shader.setFloat("backLightFactor", backLight * 0.6f);
@@ -56,4 +64,11 @@ void SaturnRings::render(Renderer& renderer) {
     shader.setBool("useColorOverride", false);
     shader.setFloat("backLightFactor", 0.0f);
     shader.setFloat("globalAlpha", 1.0f);
+
+    glDepthMask(depthWriteWasEnabled);
+    if (blendWasEnabled) {
+        glEnable(GL_BLEND);
+    } else {
+        glDisable(GL_BLEND);
+    }
 }

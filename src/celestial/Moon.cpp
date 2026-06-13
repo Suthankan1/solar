@@ -1,15 +1,27 @@
 #include "celestial/Moon.h"
+#include "celestial/OrbitMath.h"
 #include "celestial/Planet.h"
 #include "core/Renderer.h"
 #include <glm/gtc/matrix_transform.hpp>
 #include <cmath>
-#include <cstdlib>
+#include <iostream>
 
-Moon::Moon(const std::string& name, float radius, float orbitRadius, float orbitSpeed, float rotationSpeed, const glm::vec3& color, std::shared_ptr<Planet> parentPlanet, const std::string& texturePath)
+Moon::Moon(const std::string& name,
+           float radius,
+           float orbitRadius,
+           float orbitSpeed,
+           float rotationSpeed,
+           const glm::vec3& color,
+           std::shared_ptr<Planet> parentPlanet,
+           const std::string& texturePath,
+           float orbitPhaseOffset,
+           float orbitInclination,
+           float longitudeOfAscendingNode)
     : SceneObject(name), m_orbitRadius(orbitRadius), m_orbitSpeed(orbitSpeed),
-      m_rotationSpeed(rotationSpeed), m_color(color), m_parentPlanet(parentPlanet),
-      m_orbitAngle(0.0f), m_rotationAngle(0.0f), m_worldPosition(0.0f) {
-    m_orbitAngle = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX) * 2.0f * 3.1415926f;
+      m_rotationSpeed(rotationSpeed), m_orbitInclination(orbitInclination),
+      m_longitudeOfAscendingNode(longitudeOfAscendingNode), m_color(color),
+      m_parentPlanet(parentPlanet), m_orbitAngle(orbitPhaseOffset), m_rotationAngle(0.0f),
+      m_worldPosition(0.0f), m_warnedAboutParentOverlap(false) {
     m_transform.setScale(glm::vec3(radius));
 
     if (!texturePath.empty()) {
@@ -25,13 +37,32 @@ void Moon::update(float deltaTime) {
     m_rotationAngle += m_rotationSpeed * deltaTime;
 
     glm::vec3 parentPos = m_parentPlanet ? m_parentPlanet->getPosition() : glm::vec3(0.0f);
-    float x = std::cos(m_orbitAngle) * m_orbitRadius;
-    float z = std::sin(m_orbitAngle) * m_orbitRadius;
-    glm::vec3 worldPos = parentPos + glm::vec3(x, 0.0f, z);
+    glm::vec3 worldPos = parentPos + calculateOrbitPosition(
+        m_orbitRadius,
+        m_orbitRadius,
+        m_orbitInclination,
+        m_longitudeOfAscendingNode,
+        m_orbitAngle
+    );
 
     m_transform.setPosition(worldPos);
     m_worldPosition = worldPos;
     m_transform.setRotation(glm::vec3(0.0f, m_rotationAngle, 0.0f));
+
+#ifndef NDEBUG
+    if (m_parentPlanet && !m_warnedAboutParentOverlap) {
+        const float safeDistance = m_parentPlanet->getRadius() + getRadius() + 0.05f;
+        const float actualDistance = glm::distance(worldPos, parentPos);
+        if (actualDistance < safeDistance) {
+            std::cerr << "Layout Warning: " << m_name
+                      << " is inside the safe clearance around "
+                      << m_parentPlanet->getName()
+                      << " (distance=" << actualDistance
+                      << ", required=" << safeDistance << ").\n";
+            m_warnedAboutParentOverlap = true;
+        }
+    }
+#endif
 }
 
 void Moon::render(Renderer& renderer) {
@@ -68,7 +99,7 @@ void Moon::render(Renderer& renderer) {
     shader.setInt("planetId", planetId);
 
     // Moons are lit by the central star
-    renderer.renderWithLighting(renderer.getSphereMesh(), shader, model);
+    renderer.renderWithLighting(renderer.getSphereMeshForRadius(getRadius(), dist), shader, model);
 
     shader.setBool("useColorOverride", false);
     shader.setBool("useTexture", false);

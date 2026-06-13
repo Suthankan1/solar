@@ -4,6 +4,7 @@
 #include <glm/glm.hpp>
 #include <string>
 #include <memory>
+#include <cstddef>
 
 class Shader;
 
@@ -28,4 +29,5 @@ private:
     GLuint m_VAO;
     GLuint m_VBO;
     GLuint m_textureID;
+    std::size_t m_vboCapacityBytes;
 };

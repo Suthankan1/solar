@@ -1,4 +1,5 @@
 #include "celestial/Spacecraft.h"
+#include "celestial/OrbitMath.h"
 #include "celestial/Planet.h"
 #include "core/Renderer.h"
 #include <GLFW/glfw3.h>
@@ -433,26 +434,13 @@ Mesh Spacecraft::createUnitCylinder(unsigned int segments) {
 glm::vec3 Spacecraft::getPlanetPositionAtAngle(std::shared_ptr<Planet> planet, float angle) const {
     if (!planet) return glm::vec3(0.0f);
 
-    float theta = angle;
-    float iRad = glm::radians(planet->getInclination());
-    float omegaRad = glm::radians(planet->getLongitudeOfAscendingNode());
-
-    // 1. Position in orbital plane
-    float x0 = planet->getSemiMajorAxis() * std::cos(theta);
-    float z0 = planet->getSemiMinorAxis() * std::sin(theta);
-
-    // 2. Inclination
-    float x1 = x0;
-    float y1 = -z0 * std::sin(iRad);
-    float z1 = z0 * std::cos(iRad);
-
-    // 3. Longitude of ascending node
-    glm::vec3 position;
-    position.x = x1 * std::cos(omegaRad) - z1 * std::sin(omegaRad);
-    position.y = y1;
-    position.z = x1 * std::sin(omegaRad) + z1 * std::cos(omegaRad);
-
-    return position;
+    return calculateOrbitPosition(
+        planet->getSemiMajorAxis(),
+        planet->getSemiMinorAxis(),
+        planet->getInclination(),
+        planet->getLongitudeOfAscendingNode(),
+        angle
+    );
 }
 
 Mesh Spacecraft::createUnitCone(unsigned int segments) {

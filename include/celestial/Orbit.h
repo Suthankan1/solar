@@ -9,7 +9,7 @@ class Planet;
 
 /**
  * @class Orbit
- * @brief Provides a visual representation of an orbital path as a GL_LINE_LOOP ring mesh.
+ * @brief Provides a visual representation of an orbital path as a thin tube mesh.
  */
 class Orbit : public SceneObject {
 public:
@@ -21,7 +21,14 @@ public:
     void update(float deltaTime) override;
     void render(Renderer& renderer) override;
 
+    void setLocalOrbitStyle(float planeOffset, const glm::vec3& color, float alphaMultiplier = 1.0f);
+    void setEmphasized(bool emphasized) { m_emphasized = emphasized; }
+    void setHighQuality(bool enabled);
+
 private:
+    float calculateAdaptiveAlpha(const Renderer& renderer) const;
+    void rebuildMesh(unsigned int segments);
+
     float m_semiMajorAxis;
     float m_semiMinorAxis;
     float m_inclination;
@@ -29,5 +36,10 @@ private:
     glm::vec3 m_color;
     std::shared_ptr<Planet> m_parentPlanet;
     glm::vec3 m_center;
+    bool m_isLocalOrbit;
+    bool m_emphasized;
+    bool m_highQuality;
+    float m_planeOffset;
+    float m_alphaMultiplier;
     std::unique_ptr<Mesh> m_mesh;
 };

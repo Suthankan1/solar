@@ -10,6 +10,10 @@ class Planet;
 
 class SaturnRings : public SceneObject {
 public:
+    static constexpr float kInnerRadiusMultiplier = 1.38f;
+    static constexpr float kMiddleRadiusMultiplier = 1.75f;
+    static constexpr float kOuterRadiusMultiplier = 2.25f;
+
     SaturnRings(const std::string& name, std::shared_ptr<Planet> parent);
     virtual ~SaturnRings() = default;
 

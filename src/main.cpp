@@ -6,6 +6,7 @@
 #include "celestial/Planet.h"
 #include "celestial/Moon.h"
 #include "celestial/Orbit.h"
+#include "celestial/OrbitMath.h"
 #include "celestial/SaturnRings.h"
 #include "celestial/AsteroidBelt.h"
 #include "celestial/CloudLayer.h"
@@ -22,6 +23,8 @@
 #include <memory>
 #include <vector>
 #include <sstream>
+#include <algorithm>
+#include <cstdio>
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/quaternion.hpp>
 
@@ -78,23 +81,134 @@ enum class DemoStage {
 float UI_SCALE = 1.35f;
 
 namespace {
+enum class OrbitQuality {
+    Low,
+    High
+};
+
 struct PlanetLayout {
     float radius;
     float semiMajorAxis;
     float semiMinorAxis;
 };
 
+// Visual scale model:
+// - Planet radii are enlarged for teaching readability, while solar orbit
+//   distances remain compressed enough to keep all planets in one scene.
+// - Local systems use their own readable scale: moon/station orbit radii are
+//   chosen from visual clearance first, not astronomical distance ratios.
+// - All starting phases are deterministic so the opening frame is repeatable
+//   and validation can catch bad placements reliably.
 constexpr PlanetLayout kMercuryLayout{0.20f, 2.0f, 1.75f};
 constexpr PlanetLayout kVenusLayout{0.32f, 2.9f, 2.86f};
 constexpr PlanetLayout kEarthLayout{0.42f, 4.2f, 4.16f};
 constexpr PlanetLayout kMarsLayout{0.32f, 5.9f, 5.64f};
 constexpr PlanetLayout kJupiterLayout{1.05f, 10.2f, 10.0f};
 constexpr PlanetLayout kSaturnLayout{0.90f, 14.1f, 13.85f};
-constexpr PlanetLayout kUranusLayout{0.62f, 17.4f, 17.15f};
-constexpr PlanetLayout kNeptuneLayout{0.58f, 20.1f, 19.85f};
+constexpr PlanetLayout kUranusLayout{0.62f, 18.2f, 17.9f};
+constexpr PlanetLayout kNeptuneLayout{0.58f, 21.3f, 21.0f};
 
-constexpr float kAsteroidBeltInnerRadius = 7.1f;
-constexpr float kAsteroidBeltOuterRadius = 8.3f;
+constexpr float kAsteroidBeltInnerRadius = 7.25f;
+constexpr float kAsteroidBeltOuterRadius = 8.15f;
+
+constexpr float kEarthCloudScale = 1.015f;
+constexpr float kEarthAtmosphereScale = 1.035f;
+constexpr float kEarthMoonRadius = 0.13f;
+constexpr float kEarthMoonOrbitRadius = 1.18f;
+constexpr float kEarthMoonOrbitInclination = 5.1f;
+constexpr float kEarthMoonOrbitNode = 18.0f;
+constexpr float kEarthMoonPhase = 2.2f;
+
+constexpr float kSpaceStationOrbitRadius = 0.70f;
+constexpr float kSpaceStationOrbitInclination = 51.6f;
+constexpr float kSpaceStationOrbitNode = 0.0f;
+constexpr float kSpaceStationPhase = 5.0f;
+constexpr float kSpaceStationBoundsRadius = 0.18f;
+
+constexpr float kPhobosRadius = 0.07f;
+constexpr float kPhobosOrbitRadius = 0.56f;
+constexpr float kPhobosOrbitInclination = 1.0f;
+constexpr float kPhobosOrbitNode = 70.0f;
+constexpr float kPhobosPhase = 1.4f;
+
+constexpr float kIoRadius = 0.15f;
+constexpr float kIoOrbitRadius = 1.65f;
+constexpr float kIoOrbitInclination = 2.1f;
+constexpr float kIoOrbitNode = 35.0f;
+constexpr float kIoPhase = 0.7f;
+
+constexpr float kEuropaRadius = 0.12f;
+constexpr float kEuropaOrbitRadius = 2.25f;
+constexpr float kEuropaOrbitInclination = -3.3f;
+constexpr float kEuropaOrbitNode = 118.0f;
+constexpr float kEuropaPhase = 3.3f;
+
+struct BodyBounds {
+    std::string name;
+    glm::vec3 position;
+    float radius;
+};
+
+bool wouldOverlap(const glm::vec3& posA,
+                  float radiusA,
+                  const glm::vec3& posB,
+                  float radiusB,
+                  float margin) {
+    return glm::distance(posA, posB) < (radiusA + radiusB + margin);
+}
+
+const char* asteroidQualityName(AsteroidBelt::Quality quality) {
+    switch (quality) {
+        case AsteroidBelt::Quality::Low: return "LOW";
+        case AsteroidBelt::Quality::Medium: return "MED";
+        case AsteroidBelt::Quality::High: return "HIGH";
+    }
+    return "HIGH";
+}
+
+#ifndef NDEBUG
+void warnLayout(const std::string& message) {
+    std::cerr << "Layout Warning: " << message << '\n';
+}
+
+void validateOrbitClearance(const std::string& childName,
+                            float childRadius,
+                            const std::string& parentName,
+                            float parentRadius,
+                            float orbitRadius,
+                            float margin) {
+    const float required = parentRadius + childRadius + margin;
+    if (orbitRadius < required) {
+        warnLayout(childName + " orbit around " + parentName +
+                   " is too tight (orbit=" + std::to_string(orbitRadius) +
+                   ", required=" + std::to_string(required) + ").");
+    }
+}
+
+void validateAdjacentOrbitGap(const std::string& innerName,
+                              const PlanetLayout& inner,
+                              const std::string& outerName,
+                              const PlanetLayout& outer,
+                              float margin) {
+    const float gap = outer.semiMinorAxis - inner.semiMajorAxis;
+    const float required = inner.radius + outer.radius + margin;
+    if (gap < required) {
+        warnLayout(innerName + " and " + outerName +
+                   " orbital lanes are too close (gap=" + std::to_string(gap) +
+                   ", required=" + std::to_string(required) + ").");
+    }
+}
+
+void validateStartupOverlaps(const std::vector<BodyBounds>& bodies, float margin) {
+    for (std::size_t i = 0; i < bodies.size(); ++i) {
+        for (std::size_t j = i + 1; j < bodies.size(); ++j) {
+            if (wouldOverlap(bodies[i].position, bodies[i].radius, bodies[j].position, bodies[j].radius, margin)) {
+                warnLayout(bodies[i].name + " starts too close to " + bodies[j].name + ".");
+            }
+        }
+    }
+}
+#endif
 }
 
 // Project 3D world position to 2D screen position
@@ -113,9 +227,6 @@ static bool projectWorldToScreen(const glm::vec3& worldPos, const glm::mat4& vie
 int main() {
     try {
         std::cout << "Starting Modern OpenGL Solar System Application...\n";
-
-        // Seed random number generator
-        std::srand(12345);
 
         // Create the window wrapper (1280x720 as requested)
         Window window(1280, 720, "Solar System");
@@ -161,47 +272,171 @@ int main() {
         auto saturnOrbit = std::make_shared<Orbit>("SaturnOrbit", saturn, glm::vec3(0.48f, 0.44f, 0.33f), nullptr);
         auto uranusOrbit = std::make_shared<Orbit>("UranusOrbit", uranus, glm::vec3(0.28f, 0.42f, 0.46f), nullptr);
         auto neptuneOrbit = std::make_shared<Orbit>("NeptuneOrbit", neptune, glm::vec3(0.12f, 0.20f, 0.48f), nullptr);
-        auto moonOrbit = std::make_shared<Orbit>("MoonOrbit", 0.65f, glm::vec3(0.25f, 0.28f, 0.38f), earth);
+        auto moonOrbit = std::make_shared<Orbit>(
+            "MoonOrbit",
+            kEarthMoonOrbitRadius,
+            kEarthMoonOrbitRadius,
+            kEarthMoonOrbitInclination,
+            kEarthMoonOrbitNode,
+            glm::vec3(0.25f, 0.28f, 0.38f),
+            earth
+        );
+        moonOrbit->setLocalOrbitStyle(0.0f, glm::vec3(0.42f, 0.50f, 0.72f), 1.05f);
+        auto phobosOrbit = std::make_shared<Orbit>(
+            "PhobosOrbit",
+            kPhobosOrbitRadius,
+            kPhobosOrbitRadius,
+            kPhobosOrbitInclination,
+            kPhobosOrbitNode,
+            glm::vec3(0.55f, 0.36f, 0.28f),
+            mars
+        );
+        phobosOrbit->setLocalOrbitStyle(0.0f, glm::vec3(0.70f, 0.42f, 0.32f), 0.85f);
+        auto ioOrbit = std::make_shared<Orbit>(
+            "IoOrbit",
+            kIoOrbitRadius,
+            kIoOrbitRadius,
+            kIoOrbitInclination,
+            kIoOrbitNode,
+            glm::vec3(0.70f, 0.62f, 0.30f),
+            jupiter
+        );
+        ioOrbit->setLocalOrbitStyle(0.0f, glm::vec3(0.88f, 0.74f, 0.34f), 0.85f);
+        auto europaOrbit = std::make_shared<Orbit>(
+            "EuropaOrbit",
+            kEuropaOrbitRadius,
+            kEuropaOrbitRadius,
+            kEuropaOrbitInclination,
+            kEuropaOrbitNode,
+            glm::vec3(0.50f, 0.56f, 0.68f),
+            jupiter
+        );
+        europaOrbit->setLocalOrbitStyle(0.0f, glm::vec3(0.62f, 0.70f, 0.85f), 0.82f);
 
         // Create Moons (name, radius, orbitRadius, orbitSpeed, rotationSpeed, color, parentPlanet)
-        auto moon = std::make_shared<Moon>("Moon", 0.13f, 0.65f, 2.5f, 1.2f, glm::vec3(0.75f, 0.75f, 0.72f), earth, "textures/moon.jpg");
-        auto phobos = std::make_shared<Moon>("Phobos", 0.07f, 0.40f, 5.0f, 2.0f, glm::vec3(0.60f, 0.55f, 0.48f), mars);
-        auto io = std::make_shared<Moon>("Io", 0.15f, 1.1f, 3.0f, 1.0f, glm::vec3(0.95f, 0.88f, 0.45f), jupiter);
-        auto europa = std::make_shared<Moon>("Europa", 0.12f, 1.45f, 2.2f, 1.2f, glm::vec3(0.80f, 0.75f, 0.70f), jupiter);
+        auto moon = std::make_shared<Moon>("Moon", kEarthMoonRadius, kEarthMoonOrbitRadius, 2.5f, 1.2f, glm::vec3(0.75f, 0.75f, 0.72f), earth, "textures/moon.jpg", kEarthMoonPhase, kEarthMoonOrbitInclination, kEarthMoonOrbitNode);
+        auto phobos = std::make_shared<Moon>("Phobos", kPhobosRadius, kPhobosOrbitRadius, 5.0f, 2.0f, glm::vec3(0.60f, 0.55f, 0.48f), mars, "", kPhobosPhase, kPhobosOrbitInclination, kPhobosOrbitNode);
+        auto io = std::make_shared<Moon>("Io", kIoRadius, kIoOrbitRadius, 3.0f, 1.0f, glm::vec3(0.95f, 0.88f, 0.45f), jupiter, "", kIoPhase, kIoOrbitInclination, kIoOrbitNode);
+        auto europa = std::make_shared<Moon>("Europa", kEuropaRadius, kEuropaOrbitRadius, 2.2f, 1.2f, glm::vec3(0.80f, 0.75f, 0.70f), jupiter, "", kEuropaPhase, kEuropaOrbitInclination, kEuropaOrbitNode);
 
         // Create Space Station and its Orbit orbiting Earth
-        auto spaceStation = std::make_shared<SpaceStation>("SpaceStation", 0.52f, 2.2f, earth);
-        auto spaceStationOrbit = std::make_shared<Orbit>("SpaceStationOrbit", 0.52f, 0.52f, 51.6f, 0.0f, glm::vec3(0.2f, 0.35f, 0.45f), earth);
+        auto spaceStation = std::make_shared<SpaceStation>("SpaceStation", kSpaceStationOrbitRadius, 2.2f, earth, kSpaceStationPhase, kSpaceStationOrbitInclination, kSpaceStationOrbitNode);
+        auto spaceStationOrbit = std::make_shared<Orbit>("SpaceStationOrbit", kSpaceStationOrbitRadius, kSpaceStationOrbitRadius, kSpaceStationOrbitInclination, kSpaceStationOrbitNode, glm::vec3(0.2f, 0.35f, 0.45f), earth);
+        spaceStationOrbit->setLocalOrbitStyle(0.0f, glm::vec3(0.25f, 0.78f, 0.95f), 1.15f);
 
         // Create Spacecraft
         auto spacecraft = std::make_shared<Spacecraft>("Spacecraft", earth, mars);
 
-        // Register everything in order: sun, orbit rings, planets, moons
-        sceneManager.registerObject(sunHalo);
+        // Instantiate and register Earth's transparent layers (clouds & atmosphere)
+        auto earthClouds = std::make_shared<CloudLayer>("EarthClouds", earth, kEarthCloudScale, 1.95f);
+        auto earthAtmosphere = std::make_shared<AtmosphereLayer>("EarthAtmosphere", earth, kEarthAtmosphereScale, glm::vec3(0.25f, 0.55f, 1.0f));
+
+        // 3. Create Skybox Background
+        auto skybox = std::make_shared<Skybox>("Skybox");
+        auto starfield = std::make_shared<Starfield>("Starfield", 3000, 80.0f);
+
+        mercury->update(0.0f);
+        venus->update(0.0f);
+        earth->update(0.0f);
+        mars->update(0.0f);
+        jupiter->update(0.0f);
+        saturn->update(0.0f);
+        uranus->update(0.0f);
+        neptune->update(0.0f);
+        moon->update(0.0f);
+        phobos->update(0.0f);
+        io->update(0.0f);
+        europa->update(0.0f);
+        spaceStation->update(0.0f);
+        spacecraft->update(0.0f);
+        mercuryOrbit->update(0.0f);
+        venusOrbit->update(0.0f);
+        earthOrbit->update(0.0f);
+        marsOrbit->update(0.0f);
+        jupiterOrbit->update(0.0f);
+        saturnOrbit->update(0.0f);
+        uranusOrbit->update(0.0f);
+        neptuneOrbit->update(0.0f);
+        moonOrbit->update(0.0f);
+        phobosOrbit->update(0.0f);
+        ioOrbit->update(0.0f);
+        europaOrbit->update(0.0f);
+        spaceStationOrbit->update(0.0f);
+        saturnRings->update(0.0f);
+        earthClouds->update(0.0f);
+        earthAtmosphere->update(0.0f);
+
+#ifndef NDEBUG
+        validateOrbitClearance("Mercury", kMercuryLayout.radius, "Sun", 1.2f, kMercuryLayout.semiMinorAxis, 0.20f);
+        validateOrbitClearance("Venus", kVenusLayout.radius, "Sun", 1.2f, kVenusLayout.semiMinorAxis, 0.20f);
+        validateOrbitClearance("Earth", kEarthLayout.radius, "Sun", 1.2f, kEarthLayout.semiMinorAxis, 0.20f);
+        validateOrbitClearance("Mars", kMarsLayout.radius, "Sun", 1.2f, kMarsLayout.semiMinorAxis, 0.20f);
+        validateOrbitClearance("Jupiter", kJupiterLayout.radius, "Sun", 1.2f, kJupiterLayout.semiMinorAxis, 0.20f);
+        validateOrbitClearance("Saturn", kSaturnLayout.radius, "Sun", 1.2f, kSaturnLayout.semiMinorAxis, 0.20f);
+        validateOrbitClearance("Uranus", kUranusLayout.radius, "Sun", 1.2f, kUranusLayout.semiMinorAxis, 0.20f);
+        validateOrbitClearance("Neptune", kNeptuneLayout.radius, "Sun", 1.2f, kNeptuneLayout.semiMinorAxis, 0.20f);
+
+        validateAdjacentOrbitGap("Mercury", kMercuryLayout, "Venus", kVenusLayout, 0.25f);
+        validateAdjacentOrbitGap("Venus", kVenusLayout, "Earth", kEarthLayout, 0.28f);
+        validateAdjacentOrbitGap("Earth", kEarthLayout, "Mars", kMarsLayout, 0.30f);
+        validateAdjacentOrbitGap("Mars", kMarsLayout, "Jupiter", kJupiterLayout, 0.55f);
+        validateAdjacentOrbitGap("Jupiter", kJupiterLayout, "Saturn", kSaturnLayout, 0.55f);
+        validateAdjacentOrbitGap("Saturn", kSaturnLayout, "Uranus", kUranusLayout, 0.30f);
+        validateAdjacentOrbitGap("Uranus", kUranusLayout, "Neptune", kNeptuneLayout, 0.30f);
+
+        const float earthVisualRadius = kEarthLayout.radius * kEarthAtmosphereScale;
+        validateOrbitClearance("Moon", kEarthMoonRadius, "Earth atmosphere", earthVisualRadius, kEarthMoonOrbitRadius, 0.08f);
+        validateOrbitClearance("SpaceStation", kSpaceStationBoundsRadius, "Earth atmosphere", earthVisualRadius, kSpaceStationOrbitRadius, 0.06f);
+        validateOrbitClearance("Phobos", kPhobosRadius, "Mars", kMarsLayout.radius, kPhobosOrbitRadius, 0.07f);
+        validateOrbitClearance("Io", kIoRadius, "Jupiter", kJupiterLayout.radius, kIoOrbitRadius, 0.12f);
+        validateOrbitClearance("Europa", kEuropaRadius, "Jupiter", kJupiterLayout.radius, kEuropaOrbitRadius, 0.12f);
+
+        if ((kAsteroidBeltInnerRadius - (kMarsLayout.semiMajorAxis + kMarsLayout.radius)) < 0.55f) {
+            warnLayout("Asteroid belt inner edge is too close to Mars.");
+        }
+        if (((kJupiterLayout.semiMinorAxis - kJupiterLayout.radius) - kAsteroidBeltOuterRadius) < 0.55f) {
+            warnLayout("Asteroid belt outer edge is too close to Jupiter.");
+        }
+        const float saturnRingOuterRadius = kSaturnLayout.radius * SaturnRings::kOuterRadiusMultiplier;
+        const float saturnToUranusGap = kUranusLayout.semiMinorAxis - kSaturnLayout.semiMajorAxis;
+        if (saturnToUranusGap < saturnRingOuterRadius + kUranusLayout.radius + 0.30f) {
+            warnLayout("Saturn ring outer edge is too close to Uranus orbital lane.");
+        }
+
+        validateStartupOverlaps({
+            {"Sun", sun->getPosition(), 1.2f},
+            {"Mercury", mercury->getPosition(), mercury->getRadius()},
+            {"Venus", venus->getPosition(), venus->getRadius()},
+            {"Earth", earth->getPosition(), earthVisualRadius},
+            {"Moon", moon->getPosition(), moon->getRadius()},
+            {"SpaceStation", spaceStation->getPosition(), kSpaceStationBoundsRadius},
+            {"Mars", mars->getPosition(), mars->getRadius()},
+            {"Phobos", phobos->getPosition(), phobos->getRadius()},
+            {"Jupiter", jupiter->getPosition(), jupiter->getRadius()},
+            {"Io", io->getPosition(), io->getRadius()},
+            {"Europa", europa->getPosition(), europa->getRadius()},
+            {"Saturn", saturn->getPosition(), saturn->getRadius()},
+            {"Uranus", uranus->getPosition(), uranus->getRadius()},
+            {"Neptune", neptune->getPosition(), neptune->getRadius()}
+        }, 0.06f);
+#endif
+
+        // Register in render-friendly order: background, opaque bodies, then
+        // transparent orbit/effect layers. This keeps alpha-blended visuals
+        // from producing false overlap artifacts while preserving current
+        // planet positions for local orbit rings during update.
+        sceneManager.registerObject(skybox);
+        sceneManager.registerObject(starfield);
         sceneManager.registerObject(sun);
-
-        sceneManager.registerObject(mercuryOrbit);
-        sceneManager.registerObject(venusOrbit);
-        sceneManager.registerObject(earthOrbit);
-        sceneManager.registerObject(moonOrbit);
-        sceneManager.registerObject(spaceStationOrbit);
-        sceneManager.registerObject(marsOrbit);
-        sceneManager.registerObject(jupiterOrbit);
-        sceneManager.registerObject(saturnOrbit);
-        sceneManager.registerObject(uranusOrbit);
-        sceneManager.registerObject(neptuneOrbit);
-
         sceneManager.registerObject(mercury);
         sceneManager.registerObject(venus);
         sceneManager.registerObject(earth);
         sceneManager.registerObject(mars);
         sceneManager.registerObject(asteroidBelt);
         sceneManager.registerObject(jupiter);
-        sceneManager.registerObject(saturnRings);  // register BEFORE saturn in the list
         sceneManager.registerObject(saturn);
         sceneManager.registerObject(uranus);
         sceneManager.registerObject(neptune);
-
         sceneManager.registerObject(moon);
         sceneManager.registerObject(spaceStation);
         sceneManager.registerObject(spacecraft);
@@ -209,18 +444,23 @@ int main() {
         sceneManager.registerObject(io);
         sceneManager.registerObject(europa);
 
-        // Instantiate and register Earth's transparent layers (clouds & atmosphere)
-        auto earthClouds = std::make_shared<CloudLayer>("EarthClouds", earth, 1.015f, 1.95f);
-        auto earthAtmosphere = std::make_shared<AtmosphereLayer>("EarthAtmosphere", earth, 1.035f, glm::vec3(0.25f, 0.55f, 1.0f));
+        sceneManager.registerObject(mercuryOrbit);
+        sceneManager.registerObject(venusOrbit);
+        sceneManager.registerObject(earthOrbit);
+        sceneManager.registerObject(marsOrbit);
+        sceneManager.registerObject(jupiterOrbit);
+        sceneManager.registerObject(saturnOrbit);
+        sceneManager.registerObject(uranusOrbit);
+        sceneManager.registerObject(neptuneOrbit);
+        sceneManager.registerObject(moonOrbit);
+        sceneManager.registerObject(spaceStationOrbit);
+        sceneManager.registerObject(phobosOrbit);
+        sceneManager.registerObject(ioOrbit);
+        sceneManager.registerObject(europaOrbit);
+        sceneManager.registerObject(saturnRings);
         sceneManager.registerObject(earthClouds);
         sceneManager.registerObject(earthAtmosphere);
-
-        // 3. Create Skybox Background (Skybox is registered BEFORE Starfield so it renders behind it)
-        auto skybox = std::make_shared<Skybox>("Skybox");
-        sceneManager.registerObject(skybox);
-
-        auto starfield = std::make_shared<Starfield>("Starfield", 3000, 80.0f);
-        sceneManager.registerObject(starfield);
+        sceneManager.registerObject(sunHalo);
 
         // 4. Create and Register Cameras
         auto sysCamera = std::make_shared<StaticCamera>("SystemCamera", glm::vec3(0.0f, 9.5f, 18.0f), glm::vec3(0.0f, 0.0f, 0.0f));
@@ -235,6 +475,11 @@ int main() {
 
         // Vector of all planets for keyboard selection cycling
         std::vector<std::shared_ptr<Planet>> planets = { mercury, venus, earth, mars, jupiter, saturn, uranus, neptune };
+        std::vector<std::shared_ptr<Orbit>> solarOrbits = { mercuryOrbit, venusOrbit, earthOrbit, marsOrbit, jupiterOrbit, saturnOrbit, uranusOrbit, neptuneOrbit };
+        std::vector<std::shared_ptr<Orbit>> allOrbits = {
+            mercuryOrbit, venusOrbit, earthOrbit, marsOrbit, jupiterOrbit, saturnOrbit, uranusOrbit, neptuneOrbit,
+            moonOrbit, spaceStationOrbit, phobosOrbit, ioOrbit, europaOrbit
+        };
 
         std::cout << "Scene Manager initialized: Objects and cameras registered successfully.\n";
         std::cout << "Press keys [1], [2], [3], or [4] to switch cameras:\n";
@@ -243,12 +488,15 @@ int main() {
         std::cout << "  [3] Side View (Static Camera)\n";
         std::cout << "  [4] Free Fly Camera (WASD to move, Q/E to fly up/down, Mouse to look)\n";
         std::cout << "Press [SPACE] to pause/resume simulation, and [+/-] to speed up/slow down.\n";
+        std::cout << "Performance toggles: [F2] VSync, [G] Bloom, [F3] Bloom passes, [F4] Asteroids, [F5] Orbits, [F6] Text, [F7] Sphere LOD, [F8] Debug logging.\n";
         std::cout << "Press [ESC] inside the window to exit.\n";
 
         double lastTime = glfwGetTime();
         double lastFPSTime = lastTime;
         int frameCount = 0;
-        float smoothedDeltaTime = 1.0f / 60.0f;
+        float smoothedFrameTimeMs = 1000.0f / 60.0f;
+        float displayFPS = 60.0f;
+        float displayFrameMs = 1000.0f / 60.0f;
 
         float animationSpeed = 1.0f;   // multiplier
         bool  animationPaused = false;
@@ -264,6 +512,17 @@ int main() {
 
         bool bloomEnabled = true;
         bool gWasPressed = false;
+        bool reducedBloomPasses = true;
+        bool f2WasPressed = false;
+        bool f3WasPressed = false;
+        bool f4WasPressed = false;
+        bool f5WasPressed = false;
+        bool f6WasPressed = false;
+        bool f7WasPressed = false;
+        bool f8WasPressed = false;
+        bool textOverlayEnabled = true;
+        bool debugLoggingEnabled = false;
+        OrbitQuality orbitQuality = OrbitQuality::High;
         bool vignetteActive = true;
         bool vWasPressed = false;
 
@@ -537,9 +796,18 @@ int main() {
             double currentTime = glfwGetTime();
             float rawDeltaTime = static_cast<float>(currentTime - lastTime);
             lastTime = currentTime;
-            float clampedDeltaTime = glm::clamp(rawDeltaTime, 0.001f, 1.0f / 20.0f);
-            smoothedDeltaTime = glm::mix(smoothedDeltaTime, clampedDeltaTime, 0.12f);
-            float deltaTime = smoothedDeltaTime;
+            if (rawDeltaTime < 0.0f) {
+                rawDeltaTime = 0.0f;
+            }
+            const float deltaTime = glm::clamp(rawDeltaTime, 0.0f, 1.0f / 20.0f);
+            smoothedFrameTimeMs = glm::mix(smoothedFrameTimeMs, deltaTime * 1000.0f, 0.08f);
+            displayFrameMs = smoothedFrameTimeMs;
+            displayFPS = displayFrameMs > 0.001f ? 1000.0f / displayFrameMs : 0.0f;
+
+            if (debugLoggingEnabled && rawDeltaTime > 0.12f) {
+                std::cout << "Frame spike: raw=" << (rawDeltaTime * 1000.0f)
+                          << "ms clamped=" << (deltaTime * 1000.0f) << "ms\n";
+            }
 
             GLFWwindow* glWin = window.getGLFWWindow();
 
@@ -654,6 +922,76 @@ int main() {
                 std::cout << "Cinematic Bloom " << (bloomEnabled ? "ENABLED" : "DISABLED") << std::endl;
             }
             gWasPressed = gIsPressed;
+
+            bool f2IsPressed = (glfwGetKey(glWin, GLFW_KEY_F2) == GLFW_PRESS);
+            if (f2IsPressed && !f2WasPressed) {
+                window.setVSync(!window.isVSyncEnabled());
+                std::cout << "VSync " << (window.isVSyncEnabled() ? "ENABLED" : "DISABLED") << std::endl;
+            }
+            f2WasPressed = f2IsPressed;
+
+            bool f3IsPressed = (glfwGetKey(glWin, GLFW_KEY_F3) == GLFW_PRESS);
+            if (f3IsPressed && !f3WasPressed) {
+                reducedBloomPasses = !reducedBloomPasses;
+                renderer.setBloomBlurPasses(reducedBloomPasses ? 4u : 6u);
+                std::cout << "Bloom blur passes: " << renderer.getBloomBlurPasses() << std::endl;
+            }
+            f3WasPressed = f3IsPressed;
+
+            bool f4IsPressed = (glfwGetKey(glWin, GLFW_KEY_F4) == GLFW_PRESS);
+            if (f4IsPressed && !f4WasPressed) {
+                AsteroidBelt::Quality nextQuality = AsteroidBelt::Quality::Medium;
+                if (asteroidBelt->getQuality() == AsteroidBelt::Quality::Medium) {
+                    nextQuality = AsteroidBelt::Quality::High;
+                } else if (asteroidBelt->getQuality() == AsteroidBelt::Quality::High) {
+                    nextQuality = AsteroidBelt::Quality::Low;
+                }
+                asteroidBelt->setQuality(nextQuality);
+                std::cout << "Asteroid quality: " << asteroidQualityName(nextQuality) << std::endl;
+            }
+            f4WasPressed = f4IsPressed;
+
+            bool f5IsPressed = (glfwGetKey(glWin, GLFW_KEY_F5) == GLFW_PRESS);
+            if (f5IsPressed && !f5WasPressed) {
+                orbitQuality = (orbitQuality == OrbitQuality::High) ? OrbitQuality::Low : OrbitQuality::High;
+                const bool highQualityOrbits = orbitQuality == OrbitQuality::High;
+                for (const auto& orbit : allOrbits) {
+                    if (orbit) {
+                        orbit->setHighQuality(highQualityOrbits);
+                    }
+                }
+                std::cout << "Orbit quality: " << (highQualityOrbits ? "HIGH" : "LOW") << std::endl;
+            }
+            f5WasPressed = f5IsPressed;
+
+            bool f6IsPressed = (glfwGetKey(glWin, GLFW_KEY_F6) == GLFW_PRESS);
+            if (f6IsPressed && !f6WasPressed) {
+                textOverlayEnabled = !textOverlayEnabled;
+                std::cout << "Text overlay " << (textOverlayEnabled ? "ENABLED" : "DISABLED") << std::endl;
+            }
+            f6WasPressed = f6IsPressed;
+
+            bool f7IsPressed = (glfwGetKey(glWin, GLFW_KEY_F7) == GLFW_PRESS);
+            if (f7IsPressed && !f7WasPressed) {
+                renderer.setSphereMeshHighQuality(!renderer.isSphereMeshHighQuality());
+                std::cout << "Sphere mesh quality: " << (renderer.isSphereMeshHighQuality() ? "HIGH" : "LOW") << std::endl;
+            }
+            f7WasPressed = f7IsPressed;
+
+            bool f8IsPressed = (glfwGetKey(glWin, GLFW_KEY_F8) == GLFW_PRESS);
+            if (f8IsPressed && !f8WasPressed) {
+                debugLoggingEnabled = !debugLoggingEnabled;
+                std::cout << "Debug frame logging " << (debugLoggingEnabled ? "ENABLED" : "DISABLED") << std::endl;
+            }
+            f8WasPressed = f8IsPressed;
+
+            if (bloomEnabled && displayFPS < 45.0f && renderer.getBloomBlurPasses() > 2u) {
+                renderer.setBloomBlurPasses(2u);
+                reducedBloomPasses = true;
+                if (debugLoggingEnabled) {
+                    std::cout << "Auto-reduced bloom blur passes to 2 after low FPS.\n";
+                }
+            }
 
             // L key to toggle letterbox
             bool lIsPressed = (glfwGetKey(glWin, GLFW_KEY_L) == GLFW_PRESS);
@@ -807,9 +1145,37 @@ int main() {
                 }
             }
 
+            for (std::size_t i = 0; i < solarOrbits.size(); ++i) {
+                solarOrbits[i]->setEmphasized(static_cast<int>(i) == selectedPlanetIdx);
+            }
+
             // Update scene objects
             float effectiveDelta = animationPaused ? 0.0f : (deltaTime * animationSpeed);
             sceneManager.update(effectiveDelta);
+
+#ifndef NDEBUG
+            static bool warnedMoonStationDynamicOverlap = false;
+            static bool warnedIoEuropaDynamicOverlap = false;
+            auto warnDynamicOverlapOnce = [](const std::string& aName,
+                                             const glm::vec3& aPos,
+                                             float aRadius,
+                                             const std::string& bName,
+                                             const glm::vec3& bPos,
+                                             float bRadius,
+                                             float margin,
+                                             bool& warned) {
+                if (!warned && wouldOverlap(aPos, aRadius, bPos, bRadius, margin)) {
+                    warnLayout(aName + " updated too close to " + bName + ".");
+                    warned = true;
+                }
+            };
+            warnDynamicOverlapOnce("Moon", moon->getPosition(), moon->getRadius(),
+                                   "SpaceStation", spaceStation->getPosition(), kSpaceStationBoundsRadius,
+                                   0.06f, warnedMoonStationDynamicOverlap);
+            warnDynamicOverlapOnce("Io", io->getPosition(), io->getRadius(),
+                                   "Europa", europa->getPosition(), europa->getRadius(),
+                                   0.08f, warnedIoEuropaDynamicOverlap);
+#endif
 
             // Render scene
             sceneManager.render(renderer);
@@ -825,6 +1191,7 @@ int main() {
             glm::vec4 manualBorderCol(0.15f, 0.30f, 0.55f, 0.40f);
             glm::vec4 manualBgCol(0.06f, 0.08f, 0.12f, 0.75f);
 
+            if (textOverlayEnabled) {
             // 1. --- FLOATING PLANET NAME LABELS (Manual mode only) ---
             if (currentDemo == DemoStage::NONE && sceneManager.getActiveCamera()) {
                 float aspect = static_cast<float>(width) / static_cast<float>(height);
@@ -1104,8 +1471,11 @@ int main() {
                     }
                 }
                 
-                float trW = 260.0f * UI_SCALE;
-                float trH = 60.0f * UI_SCALE;
+                char perfBuf[96];
+                std::snprintf(perfBuf, sizeof(perfBuf), "FPS: %.0f | %.2f ms", displayFPS, displayFrameMs);
+
+                float trW = 300.0f * UI_SCALE;
+                float trH = 80.0f * UI_SCALE;
                 float trX = width - trW - 15.0f;
                 float trY = height - trH - 15.0f;
                 
@@ -1114,6 +1484,7 @@ int main() {
                 
                 textRenderer.renderText(camStr, trX + 15.0f * UI_SCALE, trY + trH - 22.0f * UI_SCALE, 1.0f * UI_SCALE, glm::vec3(0.0f, 1.0f, 1.0f), width, height);
                 textRenderer.renderText(speedOverlayStr, trX + 15.0f * UI_SCALE, trY + trH - 42.0f * UI_SCALE, 1.0f * UI_SCALE, speedColor, width, height);
+                textRenderer.renderText(perfBuf, trX + 15.0f * UI_SCALE, trY + trH - 62.0f * UI_SCALE, 0.95f * UI_SCALE, glm::vec3(0.78f, 0.86f, 0.92f), width, height);
             }
 
             // 5. --- BOTTOM-LEFT PANEL (Controls, Manual mode only) ---
@@ -1127,7 +1498,7 @@ int main() {
                 textRenderer.renderQuad(blX, blY, blW, blH, manualBgCol, width, height);
                 
                 textRenderer.renderText("[1-5] Cameras | [N/B] Next/Prev Planet | [ENTER] Focus", blX + 15.0f * UI_SCALE, blY + blH - 22.0f * UI_SCALE, 0.95f * UI_SCALE, glm::vec3(1.0f, 1.0f, 1.0f), width, height);
-                textRenderer.renderText("[SPACE] Pause | [+/-] Speed | [F1] Demo Mode | [G] Bloom: " + std::string(bloomEnabled ? "ON" : "OFF") + " | [V] Vignette: " + std::string(vignetteActive ? "ON" : "OFF"), blX + 15.0f * UI_SCALE, blY + blH - 42.0f * UI_SCALE, 0.95f * UI_SCALE, glm::vec3(1.0f, 1.0f, 1.0f), width, height);
+                textRenderer.renderText("[SPACE] Pause | [+/-] Speed | [F1] Demo | [G] Bloom: " + std::string(bloomEnabled ? "ON" : "OFF") + " | [F2-F8] Perf", blX + 15.0f * UI_SCALE, blY + blH - 42.0f * UI_SCALE, 0.95f * UI_SCALE, glm::vec3(1.0f, 1.0f, 1.0f), width, height);
                 textRenderer.renderText("[ESC] Exit", blX + 15.0f * UI_SCALE, blY + blH - 62.0f * UI_SCALE, 0.95f * UI_SCALE, glm::vec3(0.5f, 0.5f, 0.5f), width, height);
             }
 
@@ -1261,6 +1632,7 @@ int main() {
                 
                 textRenderer.renderText(pauseText, cardX + 20.0f * UI_SCALE, cardY + 12.0f * UI_SCALE, pauseScale, pauseColor, width, height);
             }
+            }
 
 
             // Swap buffers & poll events
@@ -1284,7 +1656,15 @@ int main() {
                     demoSuffix = " | Demo: " + subStages[currentSubStageIdx].name;
                 }
 
-                std::string title = "Solar System | FPS: " + fps_str + " | Speed: " + speed_str + "x | " + camName + demoSuffix;
+                char frameMsBuf[32];
+                std::snprintf(frameMsBuf, sizeof(frameMsBuf), "%.2f", displayFrameMs);
+
+                std::string title = "Solar System | FPS: " + fps_str +
+                                    " | " + frameMsBuf + " ms" +
+                                    " | Speed: " + speed_str + "x | " + camName +
+                                    " | VSync: " + std::string(window.isVSyncEnabled() ? "ON" : "OFF") +
+                                    " | Bloom: " + std::string(bloomEnabled ? "ON" : "OFF") +
+                                    demoSuffix;
                 window.setTitle(title);
 
                 frameCount = 0;

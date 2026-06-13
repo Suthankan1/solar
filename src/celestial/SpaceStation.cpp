@@ -1,29 +1,34 @@
 #include "celestial/SpaceStation.h"
+#include "celestial/OrbitMath.h"
 #include "celestial/Planet.h"
 #include "core/Renderer.h"
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <cmath>
-#include <cstdlib>
+#include <iostream>
 
-SpaceStation::SpaceStation(const std::string& name, float orbitRadius, float orbitSpeed, std::shared_ptr<Planet> parentPlanet)
+namespace {
+constexpr float kStationDebugBoundsRadius = 0.18f;
+}
+
+SpaceStation::SpaceStation(const std::string& name,
+                           float orbitRadius,
+                           float orbitSpeed,
+                           std::shared_ptr<Planet> parentPlanet,
+                           float orbitPhaseOffset,
+                           float orbitInclination,
+                           float longitudeOfAscendingNode)
     : SceneObject(name), m_orbitRadius(orbitRadius), m_orbitSpeed(orbitSpeed),
-      m_parentPlanet(parentPlanet), m_orbitAngle(0.0f), m_time(0.0f) {
+      m_orbitInclination(orbitInclination), m_longitudeOfAscendingNode(longitudeOfAscendingNode),
+      m_parentPlanet(parentPlanet), m_orbitAngle(orbitPhaseOffset), m_time(0.0f) {
     
-    // Spread out the station's start position along the orbit
-    m_orbitAngle = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX) * 2.0f * 3.1415926f;
-    m_lastPos = glm::vec3(
-        std::cos(m_orbitAngle) * m_orbitRadius,
-        0.0f,
-        std::sin(m_orbitAngle) * m_orbitRadius
+    m_lastPos = calculateOrbitPosition(
+        m_orbitRadius,
+        m_orbitRadius,
+        m_orbitInclination,
+        m_longitudeOfAscendingNode,
+        m_orbitAngle
     );
-    float incRad = glm::radians(51.6f);
-    m_lastPos.y = -m_lastPos.z * std::sin(incRad);
-    m_lastPos.z = m_lastPos.z * std::cos(incRad);
-
-    if (m_parentPlanet) {
-        m_transform.setParent(&m_parentPlanet->getTransform());
-    }
 
     // Initialize unit primitives
     m_cubeMesh = std::make_unique<Mesh>(createUnitCube());
@@ -35,20 +40,20 @@ void SpaceStation::update(float deltaTime) {
     m_orbitAngle += m_orbitSpeed * deltaTime;
     m_time += deltaTime;
 
-    // Calculate position in the XZ plane relative to the parent planet
-    glm::vec3 relativePos(
-        std::cos(m_orbitAngle) * m_orbitRadius,
-        0.0f,
-        std::sin(m_orbitAngle) * m_orbitRadius
+    // Local orbital offset around Earth. The station stays in world space so
+    // Earth's visual scale never shrinks the orbit radius.
+    glm::vec3 relativePos = calculateOrbitPosition(
+        m_orbitRadius,
+        m_orbitRadius,
+        m_orbitInclination,
+        m_longitudeOfAscendingNode,
+        m_orbitAngle
     );
 
-    float incRad = glm::radians(51.6f);
-    float newY = -relativePos.z * std::sin(incRad);
-    float newZ = relativePos.z * std::cos(incRad);
-    relativePos.y = newY;
-    relativePos.z = newZ;
+    glm::vec3 parentPos = m_parentPlanet ? m_parentPlanet->getPosition() : glm::vec3(0.0f);
+    glm::vec3 worldPos = parentPos + relativePos;
 
-    m_transform.setPosition(relativePos);
+    m_transform.setPosition(worldPos);
 
     if (m_time > 0.01f) {
         glm::vec3 deltaPos = relativePos - m_lastPos;
@@ -58,11 +63,7 @@ void SpaceStation::update(float deltaTime) {
     }
     m_lastPos = relativePos;
 
-    glm::vec3 earthWorldPos(0.0f);
-    if (m_parentPlanet) {
-        earthWorldPos = glm::vec3(m_parentPlanet->getTransform().getModelMatrix()[3]);
-    }
-    glm::vec3 sunDir = -glm::normalize(earthWorldPos + relativePos);
+    glm::vec3 sunDir = -glm::normalize(worldPos);
     m_sunTrackAngle = std::atan2(sunDir.x, sunDir.z);
 
     glm::vec3 upRef(0.0f, 1.0f, 0.0f);
@@ -74,6 +75,21 @@ void SpaceStation::update(float deltaTime) {
     glm::vec3 up = glm::normalize(glm::cross(m_velocity, right));
     glm::quat progradeRotation = glm::quat_cast(glm::mat3(right, up, m_velocity));
     m_transform.setRotation(glm::eulerAngles(progradeRotation));
+
+#ifndef NDEBUG
+    if (m_parentPlanet && !m_warnedAboutParentOverlap) {
+        const float safeDistance = m_parentPlanet->getRadius() + kStationDebugBoundsRadius + 0.05f;
+        const float actualDistance = glm::length(relativePos);
+        if (actualDistance < safeDistance) {
+            std::cerr << "Layout Warning: " << m_name
+                      << " is inside the safe clearance around "
+                      << m_parentPlanet->getName()
+                      << " (distance=" << actualDistance
+                      << ", required=" << safeDistance << ").\n";
+            m_warnedAboutParentOverlap = true;
+        }
+    }
+#endif
 }
 
 glm::vec3 SpaceStation::getCloseUpTargetPoint() const {

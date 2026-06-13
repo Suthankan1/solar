@@ -8,6 +8,12 @@
 
 class Renderer {
 public:
+    enum class SphereMeshQuality {
+        Low,
+        Medium,
+        High
+    };
+
     Renderer();
     ~Renderer();
 
@@ -47,7 +53,14 @@ public:
     // Access to internal resources
     const Shader& getShader() const { return *m_shader; }
     const Shader* getEarthShader() const { return m_earthShader.get(); }
-    const Mesh& getSphereMesh() const { return *m_sphereMesh; }
+    const Mesh& getSphereMesh() const;
+    const Mesh& getSphereMesh(SphereMeshQuality quality) const;
+    const Mesh& getSphereMeshForRadius(float radius, float cameraDistance) const;
+
+    void setSphereMeshHighQuality(bool enabled) { m_highQualitySpheres = enabled; }
+    bool isSphereMeshHighQuality() const { return m_highQualitySpheres; }
+    void setBloomBlurPasses(unsigned int passes) { m_bloomBlurPasses = passes; }
+    unsigned int getBloomBlurPasses() const { return m_bloomBlurPasses; }
 
     // Render a mesh using a specific shader and MVP matrices
     void render(const Mesh& mesh, const Shader& shader, const glm::mat4& model, const glm::mat4& view, const glm::mat4& projection);
@@ -80,7 +93,10 @@ private:
     glm::vec4 m_frustumPlanes[6];
     std::unique_ptr<Shader> m_shader;
     std::unique_ptr<Shader> m_earthShader;
-    std::unique_ptr<Mesh> m_sphereMesh;
+    std::unique_ptr<Mesh> m_sphereMeshLow;
+    std::unique_ptr<Mesh> m_sphereMeshMedium;
+    std::unique_ptr<Mesh> m_sphereMeshHigh;
+    bool m_highQualitySpheres = true;
 
     // Post-processing resources
     unsigned int m_hdrFBO = 0;
@@ -92,6 +108,7 @@ private:
     int m_fboHeight = 0;
     int m_blurWidth = 0;
     int m_blurHeight = 0;
+    unsigned int m_bloomBlurPasses = 4;
 
     unsigned int m_quadVAO = 0;
     unsigned int m_quadVBO = 0;

@@ -50,7 +50,7 @@ void CloudLayer::render(Renderer& renderer) {
             shader.setInt("cloudTexture", 2);
         }
 
-        renderer.renderWithLighting(renderer.getSphereMesh(), shader, model);
+        renderer.renderWithLighting(renderer.getSphereMeshForRadius(m_transform.getScale().x, glm::distance(renderer.getCameraPosition(), m_transform.getPosition())), shader, model);
 
         if (hasTexture) {
             cloudTex->unbind();
@@ -63,7 +63,7 @@ void CloudLayer::render(Renderer& renderer) {
         shader.setBool("useTexture", false);
         shader.setBool("useColorOverride", false);
 
-        renderer.renderWithLighting(renderer.getSphereMesh(), shader, model);
+        renderer.renderWithLighting(renderer.getSphereMeshForRadius(m_transform.getScale().x, glm::distance(renderer.getCameraPosition(), m_transform.getPosition())), shader, model);
     }
 
     // Restore standard OpenGL states

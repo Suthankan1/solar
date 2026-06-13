@@ -11,11 +11,19 @@
 
 class AsteroidBelt : public SceneObject {
 public:
+    enum class Quality {
+        Low,
+        Medium,
+        High
+    };
+
     AsteroidBelt(const std::string& name, float innerRadius, float outerRadius, unsigned int count);
     virtual ~AsteroidBelt() override;
 
     void update(float deltaTime) override;
     void render(Renderer& renderer) override;
+    void setQuality(Quality quality);
+    Quality getQuality() const { return m_quality; }
 
 private:
     static constexpr unsigned int kAsteroidCount = 800;
@@ -44,6 +52,8 @@ private:
     Mesh createRockyAsteroid(float baseRadius, float roughness, int seed);
 
     unsigned int m_count;
+    unsigned int m_activeCount;
+    Quality m_quality;
     Transform m_transform;
     float m_angle = 0.0f;
 
@@ -55,6 +65,7 @@ private:
     std::vector<float> m_speedMultipliers;
     std::vector<float> m_angles;
     std::vector<std::vector<InstanceData>> m_instanceDataPerMesh;
+    std::vector<float> m_heroRadii;
     std::vector<glm::vec3> m_heroPositions;
     std::vector<float> m_heroAngles;
     std::unique_ptr<Mesh> m_heroMesh;

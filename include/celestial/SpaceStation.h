@@ -21,7 +21,13 @@ public:
      * @param orbitSpeed Orbital speed
      * @param parentPlanet Shared pointer to the parent planet (e.g. Earth)
      */
-    SpaceStation(const std::string& name, float orbitRadius, float orbitSpeed, std::shared_ptr<Planet> parentPlanet);
+    SpaceStation(const std::string& name,
+                 float orbitRadius,
+                 float orbitSpeed,
+                 std::shared_ptr<Planet> parentPlanet,
+                 float orbitPhaseOffset = 0.0f,
+                 float orbitInclination = 51.6f,
+                 float longitudeOfAscendingNode = 0.0f);
     virtual ~SpaceStation() = default;
 
     void update(float deltaTime) override;
@@ -29,6 +35,8 @@ public:
 
     glm::vec3 getPosition() const { return glm::vec3(m_transform.getModelMatrix()[3]); }
     float getOrbitRadius() const { return m_orbitRadius; }
+    float getOrbitInclination() const { return m_orbitInclination; }
+    float getLongitudeOfAscendingNode() const { return m_longitudeOfAscendingNode; }
 
     glm::vec3 getCloseUpTargetPoint() const;
 
@@ -38,6 +46,8 @@ public:
 private:
     float m_orbitRadius;
     float m_orbitSpeed;
+    float m_orbitInclination;
+    float m_longitudeOfAscendingNode;
     std::shared_ptr<Planet> m_parentPlanet;
 
     float m_orbitAngle;
@@ -46,6 +56,7 @@ private:
     glm::vec3 m_velocity = glm::vec3(0.0f, 0.0f, 1.0f);
     float m_sunTrackAngle = 0.0f;
     Transform m_transform;
+    bool m_warnedAboutParentOverlap = false;
 
     // Shared primitive shapes to assemble the station
     std::unique_ptr<Mesh> m_cubeMesh;

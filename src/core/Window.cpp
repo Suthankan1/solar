@@ -4,7 +4,7 @@
 Window::Window(int width, int height, const std::string& title)
     : m_window(nullptr), m_width(width), m_height(height), m_title(title),
       m_mouseX(0.0), m_mouseY(0.0), m_mouseDeltaX(0.0), m_mouseDeltaY(0.0),
-      m_scrollDeltaY(0.0), m_firstMouse(true) {
+      m_scrollDeltaY(0.0), m_firstMouse(true), m_vsyncEnabled(true) {
     
     // Set static GLFW error callback
     glfwSetErrorCallback(Window::errorCallback);
@@ -50,6 +50,7 @@ Window::Window(int width, int height, const std::string& title)
 
     // Set default viewport
     glViewport(0, 0, m_width, m_height);
+    glfwSwapInterval(1);
 
     std::cout << "GLFW Window and OpenGL context initialized successfully.\n";
     std::cout << "OpenGL Version: " << glGetString(GL_VERSION) << std::endl;
@@ -81,6 +82,11 @@ void Window::pollEvents() {
 void Window::setTitle(const std::string& title) {
     m_title = title;
     glfwSetWindowTitle(m_window, m_title.c_str());
+}
+
+void Window::setVSync(bool enabled) {
+    m_vsyncEnabled = enabled;
+    glfwSwapInterval(enabled ? 1 : 0);
 }
 
 void Window::framebufferSizeCallback(GLFWwindow* window, int width, int height) {

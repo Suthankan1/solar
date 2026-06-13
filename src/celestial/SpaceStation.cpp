@@ -233,7 +233,7 @@ void SpaceStation::render(Renderer& renderer) {
         renderCube(panelBase, glm::vec3(0.0f, 0.0f, -0.020f), glm::vec3(0.016f, 0.0004f, 0.034f), glm::vec3(0.0f), darkBlue);
 
         // Grid lines (thin black decal boxes placed slightly above & below blanket surfaces)
-        float yOffset = 0.00025f;
+        float yOffset = 0.00045f;
         for (int side = -1; side <= 1; side += 2) {
             float y = side * yOffset;
 

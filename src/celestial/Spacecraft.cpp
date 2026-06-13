@@ -234,10 +234,10 @@ void Spacecraft::render(Renderer& renderer) {
     renderCube(modelBase, glm::vec3(0.030f, 0.0f, 0.0f), glm::vec3(0.028f, 0.0003f, 0.010f), glm::vec3(0.0f), darkBlue);
 
     // Subtle solar-cell grid strips.
-    renderCube(modelBase, glm::vec3(-0.030f, 0.00025f, -0.0025f), glm::vec3(0.027f, 0.0002f, 0.0004f), glm::vec3(0.0f), glm::vec3(0.18f, 0.28f, 0.58f));
-    renderCube(modelBase, glm::vec3(-0.030f, 0.00025f, 0.0025f), glm::vec3(0.027f, 0.0002f, 0.0004f), glm::vec3(0.0f), glm::vec3(0.18f, 0.28f, 0.58f));
-    renderCube(modelBase, glm::vec3(0.030f, 0.00025f, -0.0025f), glm::vec3(0.027f, 0.0002f, 0.0004f), glm::vec3(0.0f), glm::vec3(0.18f, 0.28f, 0.58f));
-    renderCube(modelBase, glm::vec3(0.030f, 0.00025f, 0.0025f), glm::vec3(0.027f, 0.0002f, 0.0004f), glm::vec3(0.0f), glm::vec3(0.18f, 0.28f, 0.58f));
+    renderCube(modelBase, glm::vec3(-0.030f, 0.00045f, -0.0025f), glm::vec3(0.027f, 0.0002f, 0.0004f), glm::vec3(0.0f), glm::vec3(0.18f, 0.28f, 0.58f));
+    renderCube(modelBase, glm::vec3(-0.030f, 0.00045f, 0.0025f), glm::vec3(0.027f, 0.0002f, 0.0004f), glm::vec3(0.0f), glm::vec3(0.18f, 0.28f, 0.58f));
+    renderCube(modelBase, glm::vec3(0.030f, 0.00045f, -0.0025f), glm::vec3(0.027f, 0.0002f, 0.0004f), glm::vec3(0.0f), glm::vec3(0.18f, 0.28f, 0.58f));
+    renderCube(modelBase, glm::vec3(0.030f, 0.00045f, 0.0025f), glm::vec3(0.027f, 0.0002f, 0.0004f), glm::vec3(0.0f), glm::vec3(0.18f, 0.28f, 0.58f));
 
     // Aft thruster nozzle: a short neck and flared bell.
     renderCylinder(modelBase, glm::vec3(0.0f, 0.0f, -0.016f), glm::vec3(0.006f, 0.008f, 0.006f),

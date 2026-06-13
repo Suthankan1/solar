@@ -4,6 +4,7 @@
 #include "core/Window.h"
 #include <glm/gtc/matrix_transform.hpp>
 #include <GLFW/glfw3.h>
+#include <algorithm>
 #include <cmath>
 
 // Camera base constructor
@@ -29,6 +30,11 @@ glm::mat4 Camera::getViewMatrix() const {
 
 glm::mat4 Camera::getProjectionMatrix(float aspect) const {
     return glm::perspective(glm::radians(m_fov), aspect, m_nearPlane, m_farPlane);
+}
+
+void Camera::setClipPlanes(float nearPlane, float farPlane) {
+    m_nearPlane = glm::clamp(nearPlane, 0.01f, 10.0f);
+    m_farPlane = std::max(farPlane, m_nearPlane + 1.0f);
 }
 
 // StaticCamera

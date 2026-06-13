@@ -48,6 +48,7 @@ public:
 
     float getNearPlane() const { return m_nearPlane; }
     float getFarPlane() const { return m_farPlane; }
+    void setClipPlanes(float nearPlane, float farPlane);
 
     void setTargetView(const glm::vec3& pos, const glm::vec3& lookat);
     bool isTransitioning() const { return m_transitioning; }

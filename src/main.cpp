@@ -467,6 +467,10 @@ int main() {
         auto freeCamera = std::make_shared<FreeCamera>("FreeCamera", glm::vec3(0.0f, 5.0f, 12.0f));
         auto spacecraftCamera = std::make_shared<SpacecraftFollowCamera>("Spacecraft Follow", spacecraft, 0.08f, 0.025f);
         auto trackingCamera = std::make_shared<TrackingCamera>("Planet Focus", earth, glm::vec3(0.0f, 0.36f, 0.72f));
+        sysCamera->setClipPlanes(0.015f, 1000.0f);
+        freeCamera->setClipPlanes(0.015f, 1000.0f);
+        spacecraftCamera->setClipPlanes(0.015f, 1000.0f);
+        trackingCamera->setClipPlanes(0.015f, 1000.0f);
 
         sceneManager.setActiveCamera(sysCamera);
         sceneManager.registerObject(spacecraftCamera);
@@ -624,18 +628,18 @@ int main() {
                 DemoStage::SPACE_STATION, "ISS Close Fly-By", 80.0f, 20.0f,
                 "International Space Station",
                 "A modular research laboratory in low Earth orbit, assembled using hierarchical truss lines and solar panels.",
-                "Hierarchical Model Assemblies & Local Euler Rotations", "SpaceStation", 2.5f,
-                glm::vec3(0.25f, 0.08f, 0.0f), glm::vec3(0.0f, 0.15f, 0.25f), glm::vec3(-0.25f, 0.08f, 0.0f), glm::vec3(0.0f, 0.04f, -0.28f),
-                glm::vec3(0.0f), glm::vec3(0.0f), glm::vec3(0.0f), glm::vec3(0.0f)
+                "Hierarchical Model Assemblies & Local Euler Rotations", "SpaceStation", 1.5f,
+                glm::vec3(0.95f, 0.34f, -0.72f), glm::vec3(0.74f, 0.28f, -0.42f), glm::vec3(-0.72f, 0.26f, 0.52f), glm::vec3(-0.92f, 0.20f, 0.78f),
+                glm::vec3(0.0f, 0.02f, 0.0f), glm::vec3(0.0f, 0.02f, 0.0f), glm::vec3(0.0f, 0.01f, 0.0f), glm::vec3(0.0f, 0.0f, 0.0f)
             },
             // 9. Spacecraft Mission (100-125s)
             {
                 DemoStage::SPACECRAFT, "Spacecraft Mission", 100.0f, 25.0f,
                 "Interplanetary Spacecraft",
                 "An explorer spacecraft performing a Hohmann-inspired transfer trajectory from Earth to Mars with glowing exhaust.",
-                "Tangent-based Trajectory Tracking & Follow Camera Math", "Spacecraft", 1.2f,
-                glm::vec3(-0.05f, 0.03f, -0.12f), glm::vec3(-0.04f, 0.02f, -0.08f), glm::vec3(0.06f, 0.015f, 0.03f), glm::vec3(0.09f, 0.01f, 0.06f),
-                glm::vec3(0.0f), glm::vec3(0.0f), glm::vec3(0.0f, 0.0f, 0.05f), glm::vec3(0.0f, 0.0f, 0.10f)
+                "Tangent-based Trajectory Tracking & Follow Camera Math", "Spacecraft", 1.0f,
+                glm::vec3(-0.26f, 0.12f, -0.38f), glm::vec3(-0.22f, 0.10f, -0.30f), glm::vec3(0.24f, 0.08f, 0.22f), glm::vec3(0.30f, 0.07f, 0.32f),
+                glm::vec3(0.0f, 0.01f, 0.02f), glm::vec3(0.0f, 0.01f, 0.03f), glm::vec3(0.0f, 0.0f, 0.08f), glm::vec3(0.0f, 0.0f, 0.12f)
             },
             // 10. Asteroid Belt (125-145s)
             {
@@ -698,6 +702,18 @@ int main() {
             glm::vec3 localRight(1.0f, 0.0f, 0.0f);
             glm::vec3 localUp(0.0f, 1.0f, 0.0f);
             glm::vec3 localFwd(0.0f, 0.0f, -1.0f);
+            auto normalizeOr = [](const glm::vec3& value, const glm::vec3& fallback) {
+                return glm::dot(value, value) > 0.000001f ? glm::normalize(value) : fallback;
+            };
+            auto buildStableFrame = [&](glm::vec3 forward) {
+                localFwd = normalizeOr(forward, glm::vec3(0.0f, 0.0f, -1.0f));
+                glm::vec3 upSeed(0.0f, 1.0f, 0.0f);
+                if (std::abs(glm::dot(localFwd, upSeed)) > 0.96f) {
+                    upSeed = glm::vec3(1.0f, 0.0f, 0.0f);
+                }
+                localRight = normalizeOr(glm::cross(localFwd, upSeed), glm::vec3(1.0f, 0.0f, 0.0f));
+                localUp = normalizeOr(glm::cross(localRight, localFwd), glm::vec3(0.0f, 1.0f, 0.0f));
+            };
 
             if (sub.highlight == "Sun") {
                 focusPos = sun ? sun->getPosition() : glm::vec3(0.0f);
@@ -716,16 +732,13 @@ int main() {
             } else if (sub.highlight == "SpaceStation" && spaceStation) {
                 focusPos = spaceStation->getPosition();
                 glm::mat4 model = spaceStation->getTransform().getModelMatrix();
-                localRight = glm::normalize(glm::vec3(model[0]));
-                localUp = glm::normalize(glm::vec3(model[1]));
-                localFwd = glm::normalize(glm::vec3(model[2]));
+                localRight = normalizeOr(glm::vec3(model[0]), glm::vec3(1.0f, 0.0f, 0.0f));
+                localUp = normalizeOr(glm::vec3(model[1]), glm::vec3(0.0f, 1.0f, 0.0f));
+                localFwd = normalizeOr(glm::vec3(model[2]), glm::vec3(0.0f, 0.0f, -1.0f));
                 useLocalFrame = true;
             } else if (sub.highlight == "Spacecraft" && spacecraft) {
                 focusPos = spacecraft->getPosition();
-                localFwd = spacecraft->getForwardDir();
-                glm::vec3 worldUp = glm::vec3(0.0f, 1.0f, 0.0f);
-                localRight = glm::normalize(glm::cross(localFwd, worldUp));
-                localUp = glm::normalize(glm::cross(localRight, localFwd));
+                buildStableFrame(spacecraft->getForwardDir());
                 useLocalFrame = true;
             } else if (sub.highlight == "AsteroidBelt") {
                 focusPos = glm::vec3(0.0f); // centered around origin

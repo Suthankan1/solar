@@ -102,5 +102,8 @@ void Moon::render(Renderer& renderer) {
     renderer.renderWithLighting(renderer.getSphereMeshForRadius(getRadius(), dist), shader, model);
 
     shader.setBool("useColorOverride", false);
+    if (hasTexture) {
+        glActiveTexture(GL_TEXTURE0);
+    }
     shader.setBool("useTexture", false);
 }

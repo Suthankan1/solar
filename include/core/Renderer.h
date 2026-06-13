@@ -61,6 +61,7 @@ public:
     bool isSphereMeshHighQuality() const { return m_highQualitySpheres; }
     void setBloomBlurPasses(unsigned int passes) { m_bloomBlurPasses = passes; }
     unsigned int getBloomBlurPasses() const { return m_bloomBlurPasses; }
+    void bindDefaultTextureUnits() const;
 
     // Render a mesh using a specific shader and MVP matrices
     void render(const Mesh& mesh, const Shader& shader, const glm::mat4& model, const glm::mat4& view, const glm::mat4& projection);
@@ -112,6 +113,7 @@ private:
 
     unsigned int m_quadVAO = 0;
     unsigned int m_quadVBO = 0;
+    unsigned int m_defaultTexture = 0;
 
     std::unique_ptr<Shader> m_bloomShader;
     std::unique_ptr<Shader> m_blurShader;

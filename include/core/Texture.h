@@ -16,7 +16,7 @@ public:
 
     bool load(const std::string& path);
     void bind(unsigned int slot = 0) const;
-    void unbind() const;
+    void unbind(unsigned int slot = 0) const;
     void cleanup();
 
     unsigned int getID() const { return m_id; }

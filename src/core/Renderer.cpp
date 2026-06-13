@@ -57,6 +57,16 @@ bool Renderer::init() {
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glEnable(GL_PROGRAM_POINT_SIZE);
 
+    unsigned char whitePixel[4] = {255, 255, 255, 255};
+    glGenTextures(1, &m_defaultTexture);
+    glBindTexture(GL_TEXTURE_2D, m_defaultTexture);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 1, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE, whitePixel);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    bindDefaultTextureUnits();
+
     initQuad();
 
     std::cout << "Renderer initialized successfully: Shaders and default mesh (Sphere) loaded.\n";
@@ -155,6 +165,20 @@ const Mesh& Renderer::getSphereMeshForRadius(float radius, float cameraDistance)
     return *m_sphereMeshHigh;
 }
 
+void Renderer::bindDefaultTextureUnits() const {
+    if (m_defaultTexture == 0) {
+        return;
+    }
+
+    GLint previousActiveTexture = GL_TEXTURE0;
+    glGetIntegerv(GL_ACTIVE_TEXTURE, &previousActiveTexture);
+    for (unsigned int unit = 0; unit < 4; ++unit) {
+        glActiveTexture(GL_TEXTURE0 + unit);
+        glBindTexture(GL_TEXTURE_2D, m_defaultTexture);
+    }
+    glActiveTexture(previousActiveTexture);
+}
+
 void Renderer::cleanup() {
     m_sphereMeshLow.reset();
     m_sphereMeshMedium.reset();
@@ -189,9 +213,15 @@ void Renderer::cleanup() {
         glDeleteBuffers(1, &m_quadVBO);
         m_quadVBO = 0;
     }
+    if (m_defaultTexture != 0) {
+        glDeleteTextures(1, &m_defaultTexture);
+        m_defaultTexture = 0;
+    }
 }
 
 void Renderer::beginFrame() {
+    bindDefaultTextureUnits();
+
     // Query active viewport dimensions from OpenGL directly
     GLint viewport[4];
     glGetIntegerv(GL_VIEWPORT, viewport);

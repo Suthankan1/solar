@@ -110,10 +110,7 @@ void Planet::render(Renderer& renderer) {
         renderer.renderWithLighting(renderer.getSphereMeshForRadius(getRadius(), cameraDistance), shader, model);
 
         // Unbind to prevent state bleed
-        if (hasTexture) m_texture->unbind();
-        if (hasNight) m_nightTexture->unbind();
-        if (hasCloud) m_cloudTexture->unbind();
-        if (hasSpec) m_specularTexture->unbind();
+        glActiveTexture(GL_TEXTURE0);
     } else {
         const Shader& shader = renderer.getShader();
         shader.use();
@@ -146,6 +143,7 @@ void Planet::render(Renderer& renderer) {
         shader.setBool("useColorOverride", false);
         if (hasTexture) {
             shader.setBool("useTexture", false);
+            glActiveTexture(GL_TEXTURE0);
         }
     }
 }

@@ -53,7 +53,7 @@ void CloudLayer::render(Renderer& renderer) {
         renderer.renderWithLighting(renderer.getSphereMeshForRadius(m_transform.getScale().x, glm::distance(renderer.getCameraPosition(), m_transform.getPosition())), shader, model);
 
         if (hasTexture) {
-            cloudTex->unbind();
+            glActiveTexture(GL_TEXTURE0);
         }
     } else {
         const Shader& shader = renderer.getShader();

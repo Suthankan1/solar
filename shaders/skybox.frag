@@ -5,10 +5,6 @@ in vec3 TexCoords;
 
 uniform float time;
 
-// Support future cubemap texture mapping
-uniform bool useTexture;
-uniform samplerCube skyboxTex;
-
 // Simple 3D hash function
 float hash(vec3 p) {
     p = fract(p * 0.3183099 + vec3(0.1, 0.1, 0.1));
@@ -51,18 +47,6 @@ float stars(vec3 p) {
 }
 
 void main() {
-    // Check if textured skybox is enabled (future support)
-    if (useTexture) {
-        vec3 dir = normalize(TexCoords);
-        vec3 starColor = texture(skyboxTex, TexCoords).rgb * 1.3;
-        float vertical = dir.y * 0.5 + 0.5;
-        float galactic = pow(1.0 - abs(dir.y), 2.2);
-        vec3 nebulaTint = mix(vec3(0.003, 0.006, 0.018), vec3(0.014, 0.006, 0.025), vertical);
-        nebulaTint += vec3(0.010, 0.006, 0.024) * galactic * 0.35;
-        FragColor = vec4(starColor + nebulaTint, 1.0);
-        return;
-    }
-
     vec3 dir = normalize(TexCoords);
 
     // Nebula layers with slow, drifting motion (made slower and more organic)

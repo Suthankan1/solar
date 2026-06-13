@@ -50,6 +50,7 @@ void Sun::render(Renderer& renderer) {
     // Reset override
     if (hasTexture) {
         shader.setBool("useTexture", false);
+        glActiveTexture(GL_TEXTURE0);
     }
     shader.setBool("useColorOverride", false);
     shader.setFloat("emissiveStrength", 0.0f);
